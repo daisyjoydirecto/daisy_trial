@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MMFI Sales Entry</title>
+<style>
+  :root{
+    --navy:#0B1526; --navy-soft:#16213A; --slate-bg:#EEF1F6; --card-border:#E2E7EF;
+    --blue:#2563EB; --teal:#0D9488; --amber:#D97706; --red:#DC2626; --green:#059669;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--slate-bg);color:#1E293B;}
+  header{background:var(--navy);padding:18px 20px;position:sticky;top:0;z-index:20;}
+  header .inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  header .titlewrap{display:flex;align-items:center;gap:10px;}
+  header .bar{width:6px;height:26px;background:var(--teal);border-radius:4px;}
+  header h1{color:#fff;font-size:16px;margin:0;font-weight:700;letter-spacing:.2px;}
+  header p{color:#94A3B8;font-size:11px;margin:2px 0 0;}
+  .demo-pill{background:var(--amber);color:#fff;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase;}
+  .wrap{max-width:900px;margin:0 auto;padding:18px 16px 60px;}
+  .config{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12px;}
+  .config label{display:block;font-weight:700;color:#64748B;text-transform:uppercase;font-size:10px;letter-spacing:.4px;margin-bottom:6px;}
+  .config input{width:100%;padding:9px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;}
+  .config .hint{color:#94A3B8;margin-top:6px;font-size:11px;}
+  .lines{display:flex;gap:8px;margin-bottom:12px;}
+  .line-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#64748B;}
+  .line-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
+  .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:18px;}
+  .cat-card{background:#fff;border:1.5px solid var(--card-border);border-radius:10px;padding:12px;cursor:pointer;text-align:left;font-size:12.5px;font-weight:700;color:var(--navy);transition:.12s;}
+  .cat-card:hover{border-color:var(--blue);}
+  .cat-card.active{border-color:var(--teal);background:#F0FDFA;}
+  .cat-card .unit{display:block;font-weight:500;color:#94A3B8;font-size:10.5px;margin-top:3px;text-transform:none;}
+  form{display:none;}
+  form.show{display:block;}
+  .section{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:16px;margin-bottom:14px;}
+  .section h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#64748B;margin:0 0 12px;font-weight:700;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
+  .field label{display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:5px;}
+  .field label .req{color:var(--red);}
+  .field input,.field select{width:100%;padding:10px 11px;border:1px solid var(--card-border);border-radius:8px;font-size:13.5px;background:#fff;}
+  .field input:focus,.field select:focus{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue);}
+  .preview{display:flex;gap:18px;flex-wrap:wrap;background:var(--navy);border-radius:12px;padding:14px 18px;margin-bottom:14px;color:#fff;}
+  .preview .item .label{font-size:10px;text-transform:uppercase;color:#94A3B8;letter-spacing:.4px;}
+  .preview .item .val{font-size:17px;font-weight:700;margin-top:2px;}
+  .actions{display:flex;gap:10px;align-items:center;}
+  button.submit{background:var(--teal);color:#fff;border:none;padding:13px 26px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;}
+  button.submit:disabled{opacity:.6;cursor:not-allowed;}
+  button.reset{background:#fff;border:1px solid var(--card-border);padding:13px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;color:#64748B;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;max-width:90vw;text-align:center;}
+  .toast.ok{background:var(--green);}
+  .toast.err{background:var(--red);}
+  .toast.info{background:var(--navy);}
+  .empty-state{text-align:center;color:#94A3B8;font-size:13px;padding:30px 0;}
+  .demo-log{background:#fff;border:1px dashed var(--card-border);border-radius:12px;padding:14px 16px;margin-top:18px;font-size:11.5px;}
+  .demo-log h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#94A3B8;}
+  .demo-log .row{padding:8px 0;border-top:1px solid var(--card-border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+  .demo-log .row:first-child{border-top:none;}
+  .demo-log .row b{color:var(--navy);}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="titlewrap">
+      <div class="bar"></div>
+      <div>
+        <h1>MMFI Sales Entry</h1>
+        <p>Log a transaction — it writes straight to the Google Sheet</p>
+      </div>
+    </div>
+    <span class="demo-pill" id="modePill">Demo Mode</span>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="config">
+    <label>Apps Script Web App URL</label>
+    <input id="apiUrl" placeholder="Leave blank to keep exploring in demo mode, or paste your deployed URL" />
+    <div class="hint" id="hintText">No URL set — you're in <b>demo mode</b>: the form is fully live and clickable, but "Save" just logs the entry below instead of writing to a real Sheet. Paste your deployed Apps Script URL above (or hardcode it in CONFIG.WEB_APP_URL) to go live.</div>
+  </div>
+
+  <div class="lines" id="lineTabs"></div>
+  <div class="cat-grid" id="catGrid"></div>
+
+  <div id="formHost"><div class="empty-state">Pick a product line and category above to start a transaction.</div></div>
+
+  <div class="demo-log" id="demoLog" style="display:none;">
+    <h4>Demo submissions (not saved anywhere — for preview only)</h4>
+    <div id="demoLogRows"></div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  // Hardcode your deployed Apps Script URL here so staff never have to paste it:
+  WEB_APP_URL: ''
+};
+
+/* ===================================================================== *
+ *  DEMO SCHEMA — mirrors Code.gs CATEGORIES exactly, so this file can be
+ *  clicked through with zero backend. Once a real Web App URL is set,
+ *  the app fetches the live schema/refs from Apps Script instead.
+ * ===================================================================== */
+const CATEGORIES = {
+  MARKET_HOGS: { sheetName:'MARKET HOGS', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['MARKET HOGS','CULLED SOW','CULLED BOAR','CULLED GILTS','OTHER INCOME'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  CARCASS_MEAT: { sheetName:'CARCASS & MEAT PROD', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULARS', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['PORK','BEEF','CHICKEN'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULARS','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  FEEDS_PREMIXES: { sheetName:'FEEDS & PREMIXES', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'BAGS'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['BB FEEDS','BG FEEDS','PREMIXES'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','BAGS','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  OTHER_LIVE_ANIMALS: { sheetName:'OTHER LIVE ANIMALS', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['CATTLE','SHEEP','HORSE'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  COFFEE: { sheetName:'COFFEE', line:'Swine & Meat', unit:'seedlings', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'SEEDLING (BAG/POT)'}], amountQtyHeader:'SEEDLING (BAG/POT)', productCategoryOptions:['ARABICA','LIBERICA','EXCELSA','ROBUSTA'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','SEEDLING (BAG/POT)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  TABLE_EGGS: { sheetName:'TABLE EGGS', line:'Poultry', unit:'pcs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (pcs.)'}], amountQtyHeader:'QTY (pcs.)', productCategoryOptions:['BB TABLE EGGS','TETRA TABLE EGGS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (pcs.)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  CULLED_CHICKEN: { sheetName:'CULLED CHICKEN', line:'Poultry', unit:'heads', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS'}], amountQtyHeader:'HEADS', productCategoryOptions:['CULLED CHICKEN','CHICKEN DUNG'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  HATCHING_EGGS: { sheetName:'HATCHING EGGS', line:'Poultry', unit:'pcs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'TOTAL QTY DELIVERED (pcs.)'},{header:'ALLOWANCE (1%-CE / 2%-ABBA) / FREE OF CHARGE'}], soldHeader:'TOTAL QTY SOLD(pcs.)', amountQtyHeader:'TOTAL QTY SOLD(pcs.)', hasCIStatus:true, noTag:true, productCategoryOptions:['HE-CLASS A','HE-CLASS B','DELIVERY FEE','PACKAGING MATERIALS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','HOUSE # (If applicable)','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','TOTAL QTY DELIVERED (pcs.)','ALLOWANCE (1%-CE / 2%-ABBA) / FREE OF CHARGE','TOTAL QTY SOLD(pcs.)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','CI STATUS (SYSTEM UPLOAD)','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','REMARKS'] },
+  DAY_OLD_CHICKS: { sheetName:'DAY-OLD-CHICKS', line:'Poultry', unit:'chicks', dateHeader:'DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (chicks/pcs.)'},{header:'FREE OF CHARGE ALLOWANCE'}], soldHeader:'TOTAL QTY SOLD', amountQtyHeader:'TOTAL QTY SOLD', productCategoryOptions:['DAY-OLD-CHICKS','DOC BY PRODUCT','USED PACKAGING MATERIALS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (chicks/pcs.)','FREE OF CHARGE ALLOWANCE','TOTAL QTY SOLD','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','LT#','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
+  BROILERTETRA: { sheetName:'BROILERTETRA', line:'Poultry', unit:'heads', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (kgs.)'},{header:'QTY (heads)'}], amountQtyHeader:'QTY (heads)', productCategoryOptions:['BROILER CHICKEN','TETRA CHICKEN'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CYCLE #','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (kgs.)','QTY (heads)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR#','INHOUSE DR#','C.I #','SI#','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] }
+};
+
+const ENUM_OPTIONS = {
+  'CUSTOMER CATEGORY': ['WALK-IN','VOLUME BUYER','CONTRACT BUYER','SALARY DEDUCT','COMMUNITY'],
+  '2307 FORM STATUS': ['RECEIVED 2307','2307 FOR FOLLOW UP','NOT APPLICABLE'],
+  'MODE OF PAYMENT': ['CASH : OFFICE CASHIER','CASH : COD','CASH : ONLINE/BANK DEP','CREDIT'],
+  'SO STATUS': ['PENDING APPROVAL','SO APPROVED','PENDING FULFILMENT','FULFILLED','BILLED'],
+  'CI STATUS (SYSTEM UPLOAD)': ['PENDING UPLOAD','DONE UPLOAD'],
+  'WITHHOLD': ['No','Yes']
+};
+const BASE_COMPUTED = ['MONTH','PRODUCT CATEGORY','AMOUNT','WITHHELD AMOUNT','BALANCE','DUE DATE','DAYS OVERDUE','PAYMENT STATUS'];
+const REQUIRED_HEADERS = ['REPRESENTATIVE','CUSTOMER','PARTICULAR(S)','PARTICULARS','RATE','CUSTOMER CATEGORY'];
+
+function computedHeaderSet(cat){ const s={}; BASE_COMPUTED.forEach(h=>s[h]=true); if (cat.soldHeader) s[cat.soldHeader]=true; return s; }
+function fieldMeta(header, cat){
+  const h = header.trim();
+  if (ENUM_OPTIONS[h]) return { type:'select', options: ENUM_OPTIONS[h] };
+  if (h.indexOf('DATE')>=0) return { type:'date' };
+  if (h==='TERMS (# OF DAYS)' || h==='RATE' || h==='PAYMENT') return { type:'number' };
+  if (cat.qty.some(q=>q.header===h)) return { type:'number' };
+  if (['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER','PARTICULAR(S)','PARTICULARS'].indexOf(h)>=0) return { type:'text', suggest:true };
+  return { type:'text' };
+}
+function buildLocalSchema(){
+  const out = {};
+  Object.keys(CATEGORIES).forEach(key=>{
+    const cat = CATEGORIES[key];
+    const computedSet = computedHeaderSet(cat);
+    const fields = cat.headers.map(h=>{
+      const computed = !!computedSet[h];
+      const meta = computed ? {type:'computed'} : fieldMeta(h, cat);
+      return Object.assign({header:h, computed, required: !computed && REQUIRED_HEADERS.indexOf(h)>=0}, meta);
+    });
+    out[key] = { key, sheetName:cat.sheetName, line:cat.line, unit:cat.unit, productCategoryOptions:cat.productCategoryOptions, fields };
+  });
+  return out;
+}
+
+// Small realistic sample sets per category, just so the autosuggest fields feel alive in demo mode
+const DEMO_REFS = {
+  MARKET_HOGS: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['KINATE'], CUSTOMER:['EARLICK TABACO','KEAN PATRICK DAG-O'], PARTICULARS:['CULLED SOW','CULLED BOAR','CULLED GILTS'] },
+  CARCASS_MEAT: { REPRESENTATIVE:['JESON SOCONG'], SOURCE:['MCP'], CUSTOMER:['ORLAND CABANEROS EDUAVE'], PARTICULARS:['BEEF : WASTE BONES','PORK PRIME : CARCASS HEADLESS'] },
+  FEEDS_PREMIXES: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['DOUBLE HOPE'], CUSTOMER:['LAVCO'], PARTICULARS:['FEEDS : BROILER BREEDER STARTER MASH - COBB'] },
+  OTHER_LIVE_ANIMALS: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['KALILANGAN'], CUSTOMER:['RAMMEL DAGOPLO'], PARTICULARS:['SHEEP','CATTLE FATTENERS'] },
+  COFFEE: { REPRESENTATIVE:[], SOURCE:[], CUSTOMER:[], PARTICULARS:['A1 - SABIA TARDIO'] },
+  TABLE_EGGS: { REPRESENTATIVE:['HERLEEN JABINIAO'], SOURCE:['REY GO 1','PMM1'], CUSTOMER:['ROSITA ADLAWAN'], PARTICULARS:['BB : DEFORMED'] },
+  CULLED_CHICKEN: { REPRESENTATIVE:['CLYDESDALLE SUSUSCO'], SOURCE:['JIREH'], CUSTOMER:['JERALDINE LIU','JESSICA ALONZO'], PARTICULARS:['REGULAR CULLED CHICKEN'] },
+  HATCHING_EGGS: { REPRESENTATIVE:['GUEENGEL BAGONGON'], SOURCE:['PMM1'], CUSTOMER:['CEPI'], PARTICULARS:['HATCHING EGGS : CLASS A'] },
+  DAY_OLD_CHICKS: { REPRESENTATIVE:['JAZZTINEMUR GAID'], SOURCE:['CHICK HAVEN'], CUSTOMER:['DUQUE FARM CORP','AZRIEL VERANO'], PARTICULARS:['DOC CLASS A','DOC CLASS B'] },
+  BROILERTETRA: { REPRESENTATIVE:['BARBIE JOY PUYOS','SHEILA SORONIO'], SOURCE:['PMM3'], CUSTOMER:['JERICK LINDUNGAN','LEGASPI REYNALDO'], PARTICULARS:['LIVE TETRA GROW OUT'] }
+};
+
+let SCHEMA = null;
+let currentCat = null;
+let currentLine = 'Swine & Meat';
+let demoSubmissions = [];
+
+const $ = (id) => document.getElementById(id);
+function apiUrl(){ return (CONFIG.WEB_APP_URL || $('apiUrl').value || '').trim(); }
+function isDemo(){ return !apiUrl(); }
+
+function toast(msg, kind){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (kind || 'info');
+  t.style.display = 'block';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=>{ t.style.display='none'; }, 3800);
+}
+
+function updateModePill(){
+  $('modePill').style.display = isDemo() ? 'inline-block' : 'none';
+  $('hintText').innerHTML = isDemo()
+    ? 'No URL set — you\'re in <b>demo mode</b>: the form is fully live and clickable, but "Save" just logs the entry below instead of writing to a real Sheet. Paste your deployed Apps Script URL above (or hardcode it in CONFIG.WEB_APP_URL) to go live.'
+    : 'Connected — transactions will be written to your live Google Sheet.';
+}
+
+async function loadSchema(){
+  updateModePill();
+  if (isDemo()){
+    SCHEMA = buildLocalSchema();
+    renderLineTabs(); renderCatGrid();
+    return;
+  }
+  try{
+    const res = await fetch(apiUrl() + '?action=schema');
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'schema failed');
+    SCHEMA = data.categories;
+    renderLineTabs(); renderCatGrid();
+  }catch(err){
+    toast('Could not reach that URL, falling back to demo mode. ' + err.message, 'err');
+    SCHEMA = buildLocalSchema();
+    renderLineTabs(); renderCatGrid();
+  }
+}
+
+function renderLineTabs(){
+  const lines = [...new Set(Object.values(SCHEMA).map(c=>c.line))];
+  $('lineTabs').innerHTML = lines.map(l =>
+    `<button class="line-btn ${l===currentLine?'active':''}" data-line="${l}">${l}</button>`
+  ).join('');
+  $('lineTabs').querySelectorAll('.line-btn').forEach(btn=>{
+    btn.onclick = () => { currentLine = btn.dataset.line; renderLineTabs(); renderCatGrid(); };
+  });
+}
+
+function renderCatGrid(){
+  const cats = Object.entries(SCHEMA).filter(([k,c])=>c.line===currentLine);
+  $('catGrid').innerHTML = cats.map(([key,c]) =>
+    `<button class="cat-card ${key===currentCat?'active':''}" data-key="${key}">
+       ${titleCase(c.sheetName)}<span class="unit">unit: ${c.unit}</span>
+     </button>`
+  ).join('');
+  $('catGrid').querySelectorAll('.cat-card').forEach(btn=>{
+    btn.onclick = () => selectCategory(btn.dataset.key);
+  });
+}
+
+function titleCase(s){
+  return s.split(' ').map(w => w.length<=3 && w===w.toUpperCase() ? w : (w.charAt(0)+w.slice(1).toLowerCase())).join(' ');
+}
+
+const SECTIONS = {
+  transaction: { title: 'Transaction Details', keys: ['REPRESENTATIVE','SOURCE/ ORIGIN','HOUSE # (If applicable)','CYCLE #','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','DATE','CUSTOMER','PARTICULAR(S)','PARTICULARS'] },
+  volume: { title: 'Volume & Pricing', keys: [] },
+  payment: { title: 'Payment & Tax', keys: ['PAYMENT','WITHHOLD','2307 FORM STATUS','MODE OF PAYMENT','TERMS (# OF DAYS)'] },
+  refs: { title: 'References & Aging', keys: ['REF: SO #','SO STATUS','LT#','DR #','INHOUSE DR#','C.I #','CI STATUS (SYSTEM UPLOAD)','S.I #','AR-SWI #','CR#','CHEQUE #','CHEQUE DATE','TAG #'] },
+  notes: { title: 'Remarks', keys: ['REMARKS'] }
+};
+function sectionFor(header){
+  for (const key of ['transaction','payment','refs','notes']){
+    if (SECTIONS[key].keys.includes(header)) return key;
+  }
+  return 'volume';
+}
+
+async function selectCategory(key){
+  currentCat = key;
+  renderCatGrid();
+  const cat = SCHEMA[key];
+
+  let refs = { REPRESENTATIVE:[], SOURCE:[], CUSTOMER:[], PARTICULARS:[] };
+  if (isDemo()){
+    refs = DEMO_REFS[key] || refs;
+  } else {
+    try{
+      const res = await fetch(apiUrl() + '?action=refs&cat=' + key);
+      const data = await res.json();
+      if (data.ok) refs = data.refs;
+    }catch(e){}
+  }
+
+  const buckets = { transaction:[], volume:[], payment:[], refs:[], notes:[] };
+  cat.fields.filter(f=>!f.computed).forEach(f => buckets[sectionFor(f.header)].push(f));
+
+  const datalistFor = { 'REPRESENTATIVE':refs.REPRESENTATIVE, 'SOURCE/ ORIGIN':refs.SOURCE, 'CUSTOMER':refs.CUSTOMER, 'PARTICULAR(S)':refs.PARTICULARS, 'PARTICULARS':refs.PARTICULARS };
+
+  let datalistsHtml = '';
+  let html = `<form id="entryForm" class="show" novalidate>`;
+  html += `<div class="preview"><div class="item"><div class="label">Est. Amount</div><div class="val" id="pvAmount">₱0</div></div><div class="item"><div class="label">Est. Balance</div><div class="val" id="pvBalance">₱0</div></div></div>`;
+
+  ['transaction','volume','payment','refs','notes'].forEach(secKey=>{
+    const fields = buckets[secKey];
+    if (!fields.length) return;
+    html += `<div class="section"><h3>${SECTIONS[secKey].title}</h3><div class="grid">`;
+    fields.forEach(f=>{
+      const fid = 'f_' + f.header.replace(/[^a-zA-Z0-9]/g,'_');
+      html += `<div class="field"><label>${escapeHtml(f.header)}${f.required?' <span class="req">*</span>':''}</label>`;
+      if (f.type === 'select'){
+        html += `<select id="${fid}" data-h="${escapeHtml(f.header)}">${f.options.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>`;
+      } else if (f.type === 'date'){
+        html += `<input type="date" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
+      } else if (f.type === 'number'){
+        html += `<input type="number" step="any" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
+      } else if (f.suggest && datalistFor[f.header]){
+        const dlid = fid + '_dl';
+        html += `<input list="${dlid}" id="${fid}" data-h="${escapeHtml(f.header)}" autocomplete="off" />`;
+        datalistsHtml += `<datalist id="${dlid}">${(datalistFor[f.header]||[]).map(v=>`<option value="${escapeHtml(v)}">`).join('')}</datalist>`;
+      } else {
+        html += `<input type="text" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
+      }
+      html += `</div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  html += `<div class="field" style="margin-bottom:14px;"><label>PRODUCT CATEGORY <span style="font-weight:400;color:#94A3B8;">(auto-detected from Particulars — not a form field)</span></label><input value="e.g. ${cat.productCategoryOptions.slice(0,3).join(' / ')}…" disabled /></div>`;
+  html += `<div class="actions"><button type="submit" class="submit">Save Transaction</button><button type="button" class="reset" id="resetBtn">Clear Form</button></div>`;
+  html += `</form>` + datalistsHtml;
+
+  $('formHost').innerHTML = html;
+  $('entryForm').addEventListener('submit', submitForm);
+  $('resetBtn').addEventListener('click', ()=> selectCategory(key));
+  $('entryForm').querySelectorAll('input,select').forEach(el => el.addEventListener('input', updatePreview));
+
+  const dateHeader = cat.fields.find(f=>f.type==='date' && (f.header==='DATE'||f.header==='PICK-UP / DELIVERY DATE'))?.header;
+  const dateField = dateHeader ? document.querySelector(`[data-h="${dateHeader}"]`) : null;
+  if (dateField) dateField.value = new Date().toISOString().slice(0,10);
+}
+
+function updatePreview(){
+  const rate = Number(document.querySelector('[data-h="RATE"]')?.value || 0);
+  const payment = Number(document.querySelector('[data-h="PAYMENT"]')?.value || 0);
+  const qtyEls = [...document.querySelectorAll('input[type=number]')].filter(el => !['RATE','PAYMENT','TERMS (# OF DAYS)'].includes(el.dataset.h));
+  const qty = qtyEls.length ? Number(qtyEls[qtyEls.length-1].value || 0) : 0;
+  const amount = Math.round(qty * rate * 100) / 100;
+  const balance = Math.round((amount - payment) * 100) / 100;
+  $('pvAmount').textContent = peso(amount);
+  $('pvBalance').textContent = peso(balance);
+}
+
+function peso(n){ return '₱' + (Number(n)||0).toLocaleString('en-PH',{maximumFractionDigits:2}); }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function submitForm(e){
+  e.preventDefault();
+  const values = {};
+  document.querySelectorAll('#entryForm [data-h]').forEach(el=>{ values[el.dataset.h] = el.value; });
+  const btn = document.querySelector('#entryForm .submit');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  if (isDemo()){
+    await new Promise(r=>setTimeout(r, 400));
+    demoSubmissions.unshift({ category: SCHEMA[currentCat].sheetName, values, amount: $('pvAmount').textContent, balance: $('pvBalance').textContent, time: new Date().toLocaleTimeString() });
+    renderDemoLog();
+    toast('Demo save ✓ — logged below (not written to a real Sheet)', 'ok');
+    btn.disabled = false; btn.textContent = 'Save Transaction';
+    selectCategory(currentCat);
+    return;
+  }
+
+  try{
+    const res = await fetch(apiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ category: currentCat, values })
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || 'Save failed');
+    toast('Saved to ' + SCHEMA[currentCat].sheetName + ' ✓', 'ok');
+    selectCategory(currentCat);
+  }catch(err){
+    toast('Error: ' + err.message, 'err');
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save Transaction';
+  }
+}
+
+function renderDemoLog(){
+  $('demoLog').style.display = demoSubmissions.length ? 'block' : 'none';
+  $('demoLogRows').innerHTML = demoSubmissions.slice(0,8).map(s => `
+    <div class="row">
+      <span><b>${s.category}</b> — ${escapeHtml(s.values['CUSTOMER'] || s.values['PARTICULAR(S)'] || s.values['PARTICULARS'] || '—')}</span>
+      <span>Amount ${s.amount} · Balance ${s.balance} · ${s.time}</span>
+    </div>`).join('');
+}
+
+$('apiUrl').value = CONFIG.WEB_APP_URL;
+$('apiUrl').addEventListener('change', loadSchema);
+loadSchema();
+</script>
+</body>
+</html>
