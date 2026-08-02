@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MMFI Sales & AR Report</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --navy:#0B1526; --slate-bg:#EEF1F6; --card-border:#E2E7EF;
+    --blue:#2563EB; --teal:#0D9488; --amber:#D97706; --red:#DC2626; --green:#059669; --violet:#7C3AED;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--slate-bg);color:#1E293B;}
+  header{background:var(--navy);padding:20px;}
+  header .inner{max-width:1500px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;}
+  header .title{display:flex;align-items:center;gap:10px;}
+  header .bar{width:6px;height:28px;background:var(--teal);border-radius:4px;}
+  header h1{color:#fff;font-size:18px;margin:0;font-weight:700;}
+  header p{color:#94A3B8;font-size:12px;margin:3px 0 0;}
+  .ring-box{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:8px 16px;}
+  .ring-box .pct{color:#fff;font-weight:700;font-size:15px;}
+  .config-bar{background:#fff;border-bottom:1px solid var(--card-border);padding:10px 20px;}
+  .config-bar .inner{max-width:1500px;margin:0 auto;display:flex;gap:10px;align-items:center;font-size:12px;}
+  .config-bar input{flex:1;max-width:420px;padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:12.5px;}
+  .config-bar button{padding:8px 14px;border-radius:8px;border:none;background:var(--blue);color:#fff;font-weight:700;font-size:12.5px;cursor:pointer;}
+  .wrap{max-width:1500px;margin:0 auto;padding:20px;display:flex;flex-direction:column;gap:20px;}
+  .filters{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:14px;display:flex;flex-wrap:wrap;gap:12px;align-items:end;}
+  .filters .field{display:flex;flex-direction:column;gap:4px;min-width:150px;}
+  .filters label{font-size:10.5px;font-weight:700;text-transform:uppercase;color:#94A3B8;letter-spacing:.4px;}
+  .filters select,.filters input{padding:8px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:12.5px;}
+  .count-badge{margin-left:auto;font-size:12px;color:#94A3B8;font-weight:600;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;}
+  .kpi{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:14px;position:relative;overflow:hidden;}
+  .kpi .accent{position:absolute;left:0;top:0;bottom:0;width:4px;}
+  .kpi .lbl{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94A3B8;padding-left:8px;}
+  .kpi .val{font-size:22px;font-weight:700;color:var(--navy);padding-left:8px;margin-top:6px;}
+  .kpi .sub{font-size:11px;color:#94A3B8;padding-left:8px;margin-top:3px;}
+  .charts{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .charts.full{grid-template-columns:1fr;}
+  .card{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:18px;}
+  .card h3{margin:0;font-size:13.5px;font-weight:700;color:var(--navy);}
+  .card p.sub{margin:2px 0 12px;font-size:11.5px;color:#94A3B8;}
+  .card .canvas-wrap{position:relative;height:280px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  thead th{text-align:left;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:#94A3B8;background:var(--slate-bg);font-weight:700;white-space:nowrap;}
+  tbody td{padding:9px 12px;border-top:1px solid var(--card-border);white-space:nowrap;}
+  tbody tr:hover{background:#F8FAFC;}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;}
+  .table-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;}
+  .search{padding:8px 12px;border:1px solid var(--card-border);border-radius:8px;font-size:12.5px;width:260px;}
+  .table-scroll{overflow-x:auto;}
+  .empty{text-align:center;color:#94A3B8;padding:40px 0;font-size:13px;}
+  .loading{text-align:center;color:#94A3B8;padding:60px 0;font-size:14px;}
+  @media (max-width:900px){ .charts{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <div class="title">
+      <div class="bar"></div>
+      <div>
+        <h1>MMFI Sales &amp; Accounts Receivable Report</h1>
+        <p>Live across all 10 categories — Swine &amp; Meat and Poultry</p>
+      </div>
+    </div>
+    <div class="ring-box">
+      <svg width="52" height="52" viewBox="0 0 80 80" style="transform:rotate(-90deg)">
+        <circle cx="40" cy="40" r="34" fill="none" stroke="#243350" stroke-width="7"></circle>
+        <circle id="ringFg" cx="40" cy="40" r="34" fill="none" stroke="#0D9488" stroke-width="7" stroke-linecap="round" stroke-dasharray="213.6" stroke-dashoffset="213.6"></circle>
+      </svg>
+      <div><span class="pct" id="ringPct">0%</span><div style="color:#94A3B8;font-size:10.5px;">Collection Rate</div></div>
+    </div>
+  </div>
+</header>
+
+<div class="config-bar">
+  <div class="inner">
+    <span style="font-weight:700;color:#64748B;">Web App URL</span>
+    <input id="apiUrl" placeholder="https://script.google.com/macros/s/XXXXX/exec" />
+    <button id="loadBtn">Load Report</button>
+    <span style="color:#94A3B8;">Or hardcode CONFIG.WEB_APP_URL in the script.</span>
+  </div>
+</div>
+
+<div class="wrap" id="app">
+  <div class="loading">Enter your Apps Script Web App URL above and click Load Report.</div>
+</div>
+
+<script>
+const CONFIG = { WEB_APP_URL: '' };
+const T = { navy:'#0B1526', blue:'#2563EB', teal:'#0D9488', amber:'#D97706', red:'#DC2626', green:'#059669', violet:'#7C3AED' };
+const PALETTE = [T.blue, T.teal, T.amber, T.violet, '#0891B2', '#DB2777', '#65A30D', T.red, '#9333EA', '#0284C7'];
+
+let SCHEMA = null, ROWS = [], charts = {};
+const $ = id => document.getElementById(id);
+const peso = n => '₱' + (Number(n)||0).toLocaleString('en-PH',{maximumFractionDigits:0});
+const pesoFull = n => '₱' + (Number(n)||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const apiUrl = () => (CONFIG.WEB_APP_URL || $('apiUrl').value || '').trim();
+
+const STATUS_STYLE = {
+  'PAID': {bg:'#DCFCE7',fg:'#15803D'}, 'PARTIALLY PAID': {bg:'#FEF3C7',fg:'#B45309'},
+  'NO PAYMENT MADE': {bg:'#FEF9C3',fg:'#A16207'}, 'OVERDUE': {bg:'#FEE2E2',fg:'#B91C1C'},
+  'FOR REFUND': {bg:'#E0E7FF',fg:'#4338CA'}
+};
+function badge(status){
+  const s = STATUS_STYLE[String(status).toUpperCase()] || {bg:'#E2E8F0',fg:'#334155'};
+  return `<span class="badge" style="background:${s.bg};color:${s.fg}">${status || '—'}</span>`;
+}
+
+async function loadAll(){
+  const url = apiUrl();
+  if (!url){ $('app').innerHTML = '<div class="loading">Enter your Web App URL first.</div>'; return; }
+  $('app').innerHTML = '<div class="loading">Loading transactions from all 10 tabs…</div>';
+  try{
+    const [schemaRes, dataRes] = await Promise.all([
+      fetch(url + '?action=schema').then(r=>r.json()),
+      fetch(url + '?action=data').then(r=>r.json())
+    ]);
+    if (!schemaRes.ok) throw new Error(schemaRes.error);
+    if (!dataRes.ok) throw new Error(dataRes.error);
+    SCHEMA = schemaRes.categories;
+    ROWS = dataRes.rows;
+    renderApp();
+  }catch(err){
+    $('app').innerHTML = `<div class="loading">Could not load report: ${err.message}</div>`;
+  }
+}
+
+function uniqueVals(key){ return [...new Set(ROWS.map(r=>r[key]).filter(Boolean))].sort(); }
+
+let filters = { line:'All', category:'All', representative:'All', customerCategory:'All', month:'All', paymentStatus:'All', search:'' };
+
+function applyFilters(){
+  return ROWS.filter(r=>{
+    if (filters.line!=='All' && r.line!==filters.line) return false;
+    if (filters.category!=='All' && r.category!==filters.category) return false;
+    if (filters.representative!=='All' && r.representative!==filters.representative) return false;
+    if (filters.customerCategory!=='All' && r.customerCategory!==filters.customerCategory) return false;
+    if (filters.month!=='All' && r.month!==filters.month) return false;
+    if (filters.paymentStatus!=='All' && r.paymentStatus!==filters.paymentStatus) return false;
+    if (filters.search){
+      const q = filters.search.toLowerCase();
+      const hay = `${r.customer} ${r.representative} ${r.particulars}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderApp(){
+  $('app').innerHTML = `
+    <div class="filters" id="filterBar"></div>
+    <div class="kpis" id="kpiRow"></div>
+    <div class="card"><h3>Sales &amp; Collections Trend</h3><p class="sub">Monthly gross amount vs. payments received, across all categories</p><div class="canvas-wrap"><canvas id="trendChart"></canvas></div></div>
+    <div class="charts">
+      <div class="card"><h3>Sales by Category</h3><p class="sub">Gross amount distribution across all 10 product categories</p><div class="canvas-wrap"><canvas id="catChart"></canvas></div></div>
+      <div class="card"><h3>AR Aging Analysis</h3><p class="sub">Outstanding balance grouped by days overdue</p><div class="canvas-wrap"><canvas id="agingChart"></canvas></div></div>
+    </div>
+    <div class="card"><h3>Representative Performance</h3><p class="sub">Revenue generated and collection rate per representative</p><div class="canvas-wrap" id="repWrap"><canvas id="repChart"></canvas></div></div>
+    <div class="card">
+      <div class="table-head">
+        <h3 style="margin:0;">Transaction Detail</h3>
+        <input class="search" id="searchBox" placeholder="Search customer, rep, or particulars…" />
+      </div>
+      <div class="table-scroll"><table id="dataTable"></table></div>
+    </div>
+  `;
+  renderFilterBar();
+  renderAll();
+  $('searchBox').addEventListener('input', e=>{ filters.search = e.target.value; renderAll(); });
+}
+
+function renderFilterBar(){
+  const lines = ['All', ...new Set(Object.values(SCHEMA).map(c=>c.line))];
+  const cats = ['All', ...Object.keys(SCHEMA)];
+  const sel = (label, key, options, labelFn) => `
+    <div class="field"><label>${label}</label>
+      <select data-k="${key}">${options.map(o=>`<option value="${o}" ${filters[key]===o?'selected':''}>${labelFn?labelFn(o):o}</option>`).join('')}</select>
+    </div>`;
+  $('filterBar').innerHTML =
+    sel('Product Line','line',lines) +
+    sel('Category','category',cats, o => o==='All' ? 'All' : SCHEMA[o].sheetName) +
+    sel('Representative','representative',['All', ...uniqueVals('representative')]) +
+    sel('Customer Category','customerCategory',['All', ...uniqueVals('customerCategory')]) +
+    sel('Month','month',['All', ...uniqueVals('month')]) +
+    sel('Payment Status','paymentStatus',['All', ...uniqueVals('paymentStatus')]) +
+    `<div class="count-badge" id="countBadge"></div>`;
+  $('filterBar').querySelectorAll('select').forEach(s=>{
+    s.addEventListener('change', e=>{ filters[e.target.dataset.k] = e.target.value; renderAll(); });
+  });
+}
+
+function renderAll(){
+  const rows = applyFilters();
+  $('countBadge').textContent = `${rows.length} of ${ROWS.length} transactions`;
+  renderKpis(rows);
+  renderTrend(rows);
+  renderCategoryChart(rows);
+  renderAging(rows);
+  renderReps(rows);
+  renderTable(rows);
+}
+
+function renderKpis(rows){
+  const gross = rows.reduce((s,r)=>s+Number(r.amount||0),0);
+  const collected = rows.reduce((s,r)=>s+Number(r.payment||0),0);
+  const outstanding = rows.reduce((s,r)=>s+Number(r.balance||0),0);
+  const overdueRows = rows.filter(r=>String(r.paymentStatus).toUpperCase()==='OVERDUE');
+  const overdueAmt = overdueRows.reduce((s,r)=>s+Number(r.balance||0),0);
+  const rate = gross>0 ? (collected/gross*100) : 0;
+
+  const circ = 213.6;
+  $('ringFg').setAttribute('stroke-dashoffset', circ - (Math.min(100,rate)/100)*circ);
+  $('ringPct').textContent = rate.toFixed(0) + '%';
+
+  $('kpiRow').innerHTML = [
+    ['Total Gross Sales', peso(gross), rows.length + ' transactions', T.blue],
+    ['Collections Received', peso(collected), rate.toFixed(1) + '% of gross sales', T.teal],
+    ['Outstanding Balance', peso(outstanding), 'across all open accounts', T.amber],
+    ['Overdue Receivables', peso(overdueAmt), overdueRows.length + ' account(s) at risk', T.red],
+    ['Active Categories', new Set(rows.map(r=>r.category)).size + ' / 10', new Set(rows.map(r=>r.representative)).size + ' representatives', T.violet],
+  ].map(([lbl,val,sub,color])=>`
+    <div class="kpi"><div class="accent" style="background:${color}"></div>
+      <div class="lbl">${lbl}</div><div class="val">${val}</div><div class="sub">${sub}</div>
+    </div>`).join('');
+}
+
+const MONTHS_ORDER = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function destroy(key){ if (charts[key]){ charts[key].destroy(); delete charts[key]; } }
+
+function renderTrend(rows){
+  const map = {};
+  rows.forEach(r=>{ const m=r.month||'—'; if(!map[m]) map[m]={amount:0,payment:0}; map[m].amount+=Number(r.amount||0); map[m].payment+=Number(r.payment||0); });
+  const labels = MONTHS_ORDER.filter(m=>map[m]);
+  destroy('trend');
+  charts.trend = new Chart($('trendChart'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'Total Amount', data: labels.map(m=>map[m].amount), backgroundColor: T.blue, borderRadius:6 },
+        { type:'line', label:'Collections Received', data: labels.map(m=>map[m].payment), borderColor: T.teal, backgroundColor: T.teal, tension:.3, pointRadius:4 }
+      ]
+    },
+    options: { responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}}, scales:{ y:{ ticks:{ callback:v=>'₱'+(v/1000)+'k' } } } }
+  });
+}
+
+function renderCategoryChart(rows){
+  const map = {};
+  rows.forEach(r=>{ map[r.categoryLabel] = (map[r.categoryLabel]||0) + Number(r.amount||0); });
+  const entries = Object.entries(map).sort((a,b)=>b[1]-a[1]);
+  destroy('cat');
+  charts.cat = new Chart($('catChart'), {
+    type:'doughnut',
+    data:{ labels: entries.map(e=>e[0]), datasets:[{ data: entries.map(e=>e[1]), backgroundColor: PALETTE, borderColor:'#fff', borderWidth:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{ position:'right', labels:{ boxWidth:10, font:{size:10.5} } } } }
+  });
+}
+
+function agingBucket(r){
+  const bal = Number(r.balance||0);
+  if (bal<=0) return null;
+  const dov = r.daysOverdue;
+  if (dov==='' || dov==='-' || dov==='WITHIN TERMS' || dov===undefined) return 'Within Terms';
+  const n = Number(dov);
+  if (isNaN(n)) return 'Within Terms';
+  if (n<=0) return 'Within Terms';
+  if (n<=30) return '1-30 Days';
+  if (n<=60) return '31-60 Days';
+  return '60+ Days';
+}
+
+function renderAging(rows){
+  const order = ['Within Terms','1-30 Days','31-60 Days','60+ Days'];
+  const colors = { 'Within Terms':T.green, '1-30 Days':T.amber, '31-60 Days':'#EA580C', '60+ Days':T.red };
+  const map = Object.fromEntries(order.map(k=>[k,0]));
+  rows.forEach(r=>{ const b = agingBucket(r); if (b) map[b]+=Number(r.balance||0); });
+  destroy('aging');
+  charts.aging = new Chart($('agingChart'), {
+    type:'bar',
+    data:{ labels: order, datasets:[{ data: order.map(k=>map[k]), backgroundColor: order.map(k=>colors[k]), borderRadius:6 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ y:{ ticks:{ callback:v=>'₱'+(v/1000)+'k' } } } }
+  });
+}
+
+function renderReps(rows){
+  const map = {};
+  rows.forEach(r=>{
+    if (!map[r.representative]) map[r.representative] = { revenue:0, collected:0 };
+    map[r.representative].revenue += Number(r.amount||0);
+    map[r.representative].collected += Number(r.payment||0);
+  });
+  const entries = Object.entries(map).filter(([k])=>k).sort((a,b)=>b[1].revenue-a[1].revenue);
+  $('repWrap').style.height = Math.max(280, entries.length*46) + 'px';
+  destroy('rep');
+  charts.rep = new Chart($('repChart'), {
+    type:'bar',
+    data:{
+      labels: entries.map(e=>e[0]),
+      datasets:[{ label:'Revenue', data: entries.map(e=>e[1].revenue),
+        backgroundColor: entries.map(e => { const rate = e[1].revenue>0 ? e[1].collected/e[1].revenue*100 : 0; return rate>=90?T.teal:rate>=50?T.blue:T.amber; }),
+        borderRadius:6 }]
+    },
+    options:{ indexAxis:'y', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ ticks:{ callback:v=>'₱'+(v/1000)+'k' } } } }
+  });
+}
+
+function renderTable(rows){
+  const head = `<thead><tr><th>Category</th><th>Customer</th><th>Representative</th><th>Amount</th><th>Balance</th><th>Due Date</th><th>Days Overdue</th><th>Status</th></tr></thead>`;
+  const body = rows.slice(0,500).map(r=>`
+    <tr>
+      <td>${r.categoryLabel}</td>
+      <td style="font-weight:700;color:${T.navy}">${r.customer||'—'}</td>
+      <td>${r.representative||'—'}</td>
+      <td style="font-weight:700">${pesoFull(r.amount)}</td>
+      <td style="font-weight:700;color:${Number(r.balance)>0?T.red:T.green}">${pesoFull(r.balance)}</td>
+      <td>${fmtDate(r.dueDate)}</td>
+      <td>${r.daysOverdue || '—'}</td>
+      <td>${badge(r.paymentStatus)}</td>
+    </tr>`).join('');
+  $('dataTable').innerHTML = head + '<tbody>' + (body || `<tr><td colspan="8" class="empty">No records match the current filters.</td></tr>`) + '</tbody>';
+}
+
+function fmtDate(d){
+  if (!d) return '—';
+  try{ const dt = new Date(d); if (isNaN(dt.getTime())) return String(d); return dt.toLocaleDateString('en-PH',{year:'numeric',month:'short',day:'numeric'}); }
+  catch(e){ return String(d); }
+}
+
+$('apiUrl').value = CONFIG.WEB_APP_URL;
+$('loadBtn').addEventListener('click', loadAll);
+if (apiUrl()) loadAll();
+</script>
+</body>
+</html>
