@@ -49,6 +49,13 @@
   .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
   .span2{grid-column:span 2} @media(max-width:520px){.span2{grid-column:span 1}}
   .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em}
+  .switch{display:flex!important;align-items:center;gap:8px;margin-top:6px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:12.5px!important;color:var(--ink)!important;user-select:none}
+  .switch.hidden{display:none!important}
+  .switch input{display:none}
+  .switch .slider{position:relative;width:38px;height:21px;border-radius:21px;background:#c9cfc7;flex:none;transition:background .15s}
+  .switch .slider::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s}
+  .switch input:checked + .slider{background:var(--brand2)}
+  .switch input:checked + .slider::after{left:19px}
   .b-WALKIN{background:#fff1d6;color:#8a5b00}.b-OK{background:#d9f2e1;color:#16683b}.b-NO{background:#fbe0dc;color:#a2321f}.b-EMP{background:#e3eefb;color:#1e4f8a}.b-VOLUMEBUYER{background:#e2f3e8;color:#1f6b43}
   .catrow{display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap}
   .catrow select{width:auto;padding:3px 6px;font-size:12px}
@@ -187,7 +194,9 @@
           <div><label>Date</label><input type="date" id="eDate"></div>
           <div><label>Representative</label><select id="eRep"></select></div>
           <div><label>Customer category</label>
-            <select id="eCat"><option value="W">Walk-in</option><option value="V">Volume buyer</option><option value="E">Salary deduction (employee)</option></select></div>
+            <select id="eCat"><option value="W">Walk-in</option><option value="V">Volume buyer</option><option value="E">Salary deduction (employee)</option></select>
+            <label class="switch hidden" id="eVerifyBox" title="ON = only regular employees in the Employees list can avail salary deduction">
+              <input type="checkbox" id="eVerify"><span class="slider"></span><span id="eVerifyTxt">Verify with employee list</span></label></div>
           <div id="eBUBox" class="hidden"><label>Business unit</label><select id="eBU"></select></div>
           <div class="span2"><label>Customer</label>
             <input id="eCust" list="dl-customers" placeholder="Type or pick a name" autocomplete="off">
@@ -618,6 +627,9 @@ function onCustomer(keepMode){
   else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular)); }
   $('eCatBadge').textContent = badge; $('eCatBadge').className = 'badge ' + cls; $('eCatWhy').textContent = why;
   $('eBUBox').classList.toggle('hidden', !(c === 'E' && !V && !e.emp));
+  $('eVerifyBox').classList.toggle('hidden', c !== 'E');
+  $('eVerify').checked = V;
+  $('eVerifyTxt').textContent = V ? 'Verify with employee list: ON' : 'Verify with employee list: OFF — any name allowed';
   const ck = c + '|' + (c === 'V' ? key(name) : '');
   if ((!keepMode || !$('eMode').value) && ck !== lastAutoCust){
     lastAutoCust = ck;
@@ -1169,6 +1181,11 @@ $('eCust').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventD
 $('eCat').value = store('cat') || 'W';
 $('eCat').addEventListener('change', () => { store('cat', $('eCat').value); lastAutoCust = ''; $('eCust').value = ''; setCustList(); onCustomer(); $('eCust').focus(); });
 $('eBU').addEventListener('change', () => onCustomer(true));
+$('eVerify').addEventListener('change', () => {
+  saveSettings(Object.assign(settings(), {verifyEmp: $('eVerify').checked}));
+  toast($('eVerify').checked ? 'Verification ON — only regular employees in the list can avail salary deduction.' : 'Verification OFF — any name can be saved as salary deduction (choose the business unit).');
+  onCustomer(true);
+});
 $('eMode').addEventListener('change', () => { syncTerms(); recalc(); });
 $('eDocType').value = store('docType') || 'DR';
 $('eDocType').addEventListener('change', () => store('docType', $('eDocType').value));
