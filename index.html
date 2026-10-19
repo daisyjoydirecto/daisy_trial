@@ -4,9 +4,8 @@
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>newSales Entry — Sales Meat & Livestock</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<title>NewSales Entry — Sales Meat & Livestock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" media="print" onload="this.media='all'">
 <style>
   /* Palette & type matched to MCP Inventory 2.0 */
   :root{
@@ -426,12 +425,42 @@ async function api(fn, ...args){
   const c = conn();
   if (!c.url || !c.key) throw new Error('NOT_CONNECTED');
   let res, data;
-  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args})}); }
-  catch (e){ throw offlineErr(); }
+  // stop waiting after 90 s (a stuck connection is treated like no internet: saved copy + Sync still work)
+  const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ac ? setTimeout(() => ac.abort(), 90000) : 0;
+  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args}), signal: ac ? ac.signal : undefined}); }
+  catch (e){ clearTimeout(timer); throw offlineErr(); }
+  clearTimeout(timer);
   try { data = await res.json(); }
   catch (e){ throw new Error('The web app did not answer correctly. Make sure "Who has access" is "Anyone" and you deployed a new version.'); }
   if (!data.ok) throw new Error(data.error || 'Unknown error');
   return data.result;
+}
+/** The Excel reader (≈900 KB) is downloaded only when an employee list is uploaded, so the page opens fast. */
+let XLSX_P = null;
+function needXLSX(){
+  if (typeof XLSX !== 'undefined') return Promise.resolve();
+  return XLSX_P || (XLSX_P = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    sc.onload = () => res(); sc.onerror = () => { XLSX_P = null; rej(new Error('The Excel reader did not load. Check your internet connection and try again.')); };
+    document.head.appendChild(sc);
+  }));
+}
+/** On opening: show the copy saved on this computer at once, then get fresh data from the sheet in the background. */
+async function showSaved(){
+  try {
+    if (!HAS_GAS && (!conn().url || !conn().key)) return;
+    const c = await IDB.get('cache'); if (!c || !c.d) return;
+    if (c.lists) applyLists(c.lists);
+    const d = c.d;
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
+    ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); }).concat(pendingRows());
+    DATA_SINCE = d.since || ''; CACHE_AT = c.at;
+    if (d.url){ $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden'); }
+    buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters();
+    if (!LEDIT.dirty) openList(LEDIT.key);
+    $('status').textContent = 'Showing saved copy from ' + new Date(c.at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ' · getting latest data…';
+  } catch (e){ /* no saved copy yet — the normal load fills the page */ }
 }
 function showConnect(msg){ const c = conn(); $('cUrl').value = c.url; $('cKey').value = c.key; $('cErr').textContent = msg || ''; $('connectBox').classList.remove('hidden'); }
 
@@ -1196,7 +1225,7 @@ function parseEmployeeGrid(grid){
 }
 async function uploadEmployees(file, company){
   if (!ONLINE) throw new Error('uploading employees needs an internet connection');
-  if (typeof XLSX === 'undefined') throw new Error('The Excel reader did not load. Check your internet connection and reload the page.');
+  await needXLSX();
   const wb = XLSX.read(new Uint8Array(await readFile(file)), {type:'array', cellDates:true});
   const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true, defval:''});
   const list = parseEmployeeGrid(grid);
@@ -1373,7 +1402,7 @@ addLine(); addLine();
 renderLtabs();
 setModes(CAT.walkin); setCustList();
 if (AUTO_REFRESH_MIN) setInterval(() => { if (ONLINE && !$('modalRoot').innerHTML && !LEDIT.dirty && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#tab-entry'))) load(true); }, AUTO_REFRESH_MIN * 60000);
-loadDeviceState().then(() => load());
+loadDeviceState().then(showSaved).then(() => load(!!CACHE_AT));
 </script>
 <script>
 (function(){function h(){var e=document.querySelector('header.top');if(e)document.documentElement.style.setProperty('--hdr',e.offsetHeight+'px');}
