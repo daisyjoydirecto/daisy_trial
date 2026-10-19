@@ -171,7 +171,8 @@
     <p class="hint" style="margin-top:0">Type the <b>access key</b> (API_KEY in Code.gs). It is saved only in this browser.</p>
     <div class="fgrid">
       <div class="span2"><label>Web app URL</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
-      <div><label>Access key</label><input id="cKey" type="password"></div>
+      <div><label>Access key</label><input id="cKey" type="password" autocomplete="new-password" spellcheck="false">
+        <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;margin-top:4px"><input type="checkbox" id="cShow" style="width:auto"> show key</label></div>
       <div style="display:flex;align-items:flex-end"><button class="btn green" id="cGo" style="width:100%">Connect</button></div>
     </div>
     <div class="warn" id="cErr" style="margin-top:8px;font-size:13px"></div>
@@ -1111,7 +1112,7 @@ function openSettings(){
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>Settings</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
     '<h2 style="font-size:12px;color:var(--muted)">Connection</h2><div class="fgrid">' +
       '<div class="span2"><label>Web app URL</label><input id="stUrl" value="' + esc(c.url) + '"' + (HAS_GAS ? ' disabled' : '') + '></div>' +
-      '<div><label>Access key</label><input id="stKey" type="password" value="' + esc(c.key) + '"' + (HAS_GAS ? ' disabled' : '') + '></div></div>' +
+      '<div><label>Access key</label><input id="stKey" type="text" autocomplete="off" value="' + esc(c.key) + '"' + (HAS_GAS ? ' disabled' : '') + '></div></div>' +
     '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Salary deduction</h2>' +
     '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
     '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
@@ -1156,8 +1157,9 @@ window.addEventListener('offline', () => { setOnline(false); toast('Internet los
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
 $('btnDailyCsv').onclick = exportDaily;
 $('btnSettings').onclick = openSettings;
+$('cShow').addEventListener('change', () => $('cKey').type = $('cShow').checked ? 'text' : 'password');
 $('cGo').onclick = () => {
-  const url = $('cUrl').value.trim(), k = $('cKey').value.trim();
+  const url = $('cUrl').value.trim(), k = $('cKey').value.trim().replace(/^['"]|['"]$/g, '');
   if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { $('cErr').textContent = 'The URL should start with https://script.google.com/macros/s/…'; return; }
   if (!k) { $('cErr').textContent = 'Enter the access key.'; return; }
   store('apiUrl', url); store('apiKey', k); $('cErr').textContent = 'Connecting…'; load();
