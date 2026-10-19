@@ -599,24 +599,39 @@ function pendingRows(){
   return out;
 }
 function needOnline(what){ if (ONLINE) return false; toast((what || 'This') + ' needs an internet connection.', true); return true; }
-async function syncNow(){
-  const btn = $('btnRefresh'); btn.disabled = true;
-  let ok = 0; const notes = [];
+/** Upload waiting sales one by one. quiet = background after a fast save (no full reload). */
+let UPLOADING = null;
+function uploadOutbox(quiet){ return UPLOADING || (UPLOADING = doUpload(quiet).finally(() => { UPLOADING = null; })); }
+async function doUpload(quiet){
+  let ok = 0, reload = false; const notes = [];
   while (OUTBOX.length){
     const sale = OUTBOX[0];
     try {
       const r = await api('addSale', sale.rows, {uid: sale.uid, control: sale.control || undefined});
       setOnline(true); ok++;
       if (!sale.control || r.control !== sale.control) notes.push((sale.control || 'PENDING') + ' → ' + r.control + ' (' + sale.rows[0].customer + ')');
-      OUTBOX.shift(); await saveOutbox();
+      OUTBOX = OUTBOX.filter(x => x.uid !== sale.uid); await saveOutbox();
+      if (!r.firstRow || r.duplicate) reload = true;
+      else sale.rows.forEach((x, i) => ROWS.push(enrich(Object.assign({}, x, {_row: r.firstRow + i, [CONTROL_FIELD]: r.control}))));
+      ROWS = ROWS.filter(x => !x._pending).concat(pendingRows());
+      renderDay(); if (summaryVisible()) renderSummary(); updateNet();
     } catch (e){
-      if (e.offline){ setOnline(false); toast('Still offline — ' + OUTBOX.length + ' sale(s) waiting on this device.', true); }
-      else toast('Sync stopped: ' + (e.message || e), true);
+      if (e.offline){ setOnline(false); if (!quiet) toast('Still offline — ' + OUTBOX.length + ' sale(s) waiting on this device.', true); }
+      else toast('Upload stopped: ' + (e.message || e) + ' — ' + OUTBOX.length + ' sale(s) still waiting. Click ⟳ Sync to retry.', true);
       break;
     }
   }
-  btn.disabled = false; updateNet();
-  if (ok) toast('Synced ' + ok + ' sale(s) to the Google Sheet ✓' + (notes.length ? ' · New control no. — reprint: ' + notes.join(', ') : ''));
+  updateNet();
+  if (notes.length) toast('Control no. changed — please REPRINT: ' + notes.join(', '), true);
+  else if (ok && !quiet) toast('Synced ' + ok + ' sale(s) to the Google Sheet ✓');
+  if (ok) { buildIndex(); refillPool(); }
+  if (reload && quiet) load(true);
+  return ok;
+}
+async function syncNow(){
+  const btn = $('btnRefresh'); btn.disabled = true;
+  try { if (UPLOADING) await UPLOADING; await uploadOutbox(false); }
+  finally { btn.disabled = false; updateNet(); }
   await load(true, true);   // ⟳ Sync also re-reads the sheet and lists (shows edits made directly in the sheet)
 }
 
@@ -666,6 +681,7 @@ async function load(silent, fresh){
     if (fromCache) DATA_SINCE = d.since || '';
     buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters(); if (summaryVisible()) renderSummary();
     if ((listsChanged || fromCache) && !LEDIT.dirty) openList(LEDIT.key);
+    if (!fromCache && OUTBOX.length) uploadOutbox(true);
     const t = d => new Date(d).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
     $('status').textContent = fromCache ? 'OFFLINE · showing data saved ' + t(CACHE_AT) + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '')
       : ROWS.length.toLocaleString() + ' sales lines' + (DATA_SINCE ? ' since ' + fmtDate(DATA_SINCE) : ' (all history)') + ' · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) +
@@ -835,6 +851,22 @@ async function saveSale(){
   const uid = DEVICE + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   store('rep', $('eRep').value);
   let res = null;
+  if (ONLINE && POOL.length){
+    // FAST SAVE: number it with a control no. reserved for this computer, show/print at once, upload in the background
+    const control = POOL.shift(); await savePool();
+    OUTBOX.push({uid, control, rows: b.rows, info: b.info, at: Date.now()});
+    await saveOutbox();
+    const total = b.rows.reduce((a, r) => a + r.amount, 0);
+    toast('Saved ' + control + ' · ' + b.rows.length + ' line(s) · ' + peso(total) + ' ✓ — uploading to the sheet…');
+    $('dDate').value = $('eDate').value;
+    clearForm();
+    ROWS = ROWS.filter(r => !r._pending).concat(pendingRows());
+    renderDay(); if (summaryVisible()) renderSummary(); updateNet();
+    btn.disabled = false; btn.textContent = 'Save sale';
+    if ($('ePrintAfter').checked) openSlip(ROWS.filter(r => r._uid === uid), b.info);
+    uploadOutbox(true);
+    return;
+  }
   if (ONLINE){
     try { res = await api('addSale', b.rows, {uid}); }
     catch (e){ if (!e.offline){ toast('Save failed: ' + (e.message || e), true); btn.disabled = false; btn.textContent = 'Save sale'; return; } setOnline(false); }
@@ -989,7 +1021,7 @@ function renderDay(){
   groupsOf(rows).forEach((list, gk) => {
     const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0), open = DAY_OPEN.has(gk), g = 'g' + (gi++);
     const badge = r0.custCat === CAT.employee ? '<span class="badge b-EMP">EMP ' + esc(companyOf(r0)) + '</span>' : '<span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span>';
-    h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>' : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
+    h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? (ONLINE ? ' <span class="pend" title="Saved — being uploaded to the Google Sheet">⏳ uploading…</span>' : ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>') : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
       '<td style="text-align:right"><button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
     h += list.map(r => '<tr class="ln ' + g + (open ? '' : ' hidden') + '"><td style="padding-left:calc(18px * var(--fs) + 14px)">' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
       '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
@@ -1035,6 +1067,7 @@ function openEdit(r){
 }
 async function delRow(r){
   if (r._pending){
+    if (UPLOADING && ONLINE) return toast('This sale is being uploaded right now — wait a few seconds, then delete it.', true);
     if (!confirm('Remove this NOT-synced line from this device?\n\n' + r.customer + '\n' + r.particulars + ' · ' + peso(r._amt))) return;
     const sale = OUTBOX.find(s => s.uid === r._uid);
     if (sale){ const i = sale.rows.findIndex(x => x.particulars === r.particulars && num(x.amount) === r._amt); if (i >= 0) sale.rows.splice(i, 1); if (!sale.rows.length) OUTBOX = OUTBOX.filter(s => s !== sale); await saveOutbox(); }
@@ -1288,7 +1321,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   if (t.dataset.tab === 'summary') renderSummary();
 });
 $('btnRefresh').onclick = syncNow;
-window.addEventListener('online', () => { if (OUTBOX.length) toast('Internet is back — click ⟳ Sync to upload ' + OUTBOX.length + ' sale(s).'); load(true); });
+window.addEventListener('online', () => { if (OUTBOX.length) toast('Internet is back — uploading ' + OUTBOX.length + ' waiting sale(s) to the sheet…'); load(true); });
 window.addEventListener('offline', () => { setOnline(false); toast('Internet lost — you can keep entering sales. They stay on this device until you Sync.'); });
 // stop any helper file registered by an earlier version (no sw.js is used any more)
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
