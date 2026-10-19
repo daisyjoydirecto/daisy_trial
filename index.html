@@ -4,7 +4,7 @@
 <base target="_top">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NewSales Entry — Sales Meat & Livestock</title>
+<title>Sales Entry — Sales Meat & Livestock</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&display=swap" media="print" onload="this.media='all'">
 <style>
   /* Palette & type matched to MCP Inventory 2.0 */
@@ -617,7 +617,7 @@ async function syncNow(){
   }
   btn.disabled = false; updateNet();
   if (ok) toast('Synced ' + ok + ' sale(s) to the Google Sheet ✓' + (notes.length ? ' · New control no. — reprint: ' + notes.join(', ') : ''));
-  await load(true);
+  await load(true, true);   // ⟳ Sync also re-reads the sheet and lists (shows edits made directly in the sheet)
 }
 
 /* ================= data load ================= */
@@ -632,13 +632,13 @@ function enrich(o){
   o._ctrl = String(o[CONTROL_FIELD] ?? '').trim();
   return o;
 }
-async function load(silent){
+async function load(silent, fresh){
   if (!HAS_GAS && (!conn().url || !conn().key)){ showConnect(); $('status').textContent = 'Not connected'; return; }
   if (!silent) $('status').textContent = 'Loading…';
   try {
     let d, fromCache = false;
     const t0 = performance.now();
-    try { d = await api('getData', LISTS_V, {since: FULL_HISTORY ? '' : recentSince()}); setOnline(true); LAST_MS = performance.now() - t0; }
+    try { d = await api('getData', LISTS_V, {since: FULL_HISTORY ? '' : recentSince(), fresh: !!fresh}); setOnline(true); LAST_MS = performance.now() - t0; }
     catch (err){
       if (!err.offline) throw err;
       setOnline(false);
