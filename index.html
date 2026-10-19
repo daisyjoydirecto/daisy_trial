@@ -5,108 +5,141 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sales Entry — Sales Meat & Livestock</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Questrial&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  /* Palette & type matched to MCP Inventory 2.0 */
   :root{
-    --bg:#f3f4f0; --card:#fff; --ink:#1b2620; --muted:#68746c; --line:#e0e4dd;
-    --brand:#1f5f3f; --brand2:#2f8a5c; --accent:#b4432f; --soft:#eef4ef; --slip:#7cb342;
+    --bg:#f2f2f2; --card:#fff; --ink:#1a1a1a; --muted:#666; --muted2:#999; --line:#e6e6e6; --line2:#c2c2c2;
+    --black:#0d0d0d; --lime:#8db600; --olive:#5c8000; --soft:#f1f7dc; --amber:#d97706; --blue:#2668b8; --red:#b42318;
+    --brand:var(--olive); --brand2:var(--olive); --accent:var(--olive); --slip:#7cb342;
+    --font:"Century Gothic",CenturyGothic,AppleGothic,"URW Gothic","URW Gothic L","Questrial",sans-serif;
+    --serif:var(--font); --mono:var(--font);
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
-  header.top{background:var(--brand);color:#fff;padding:10px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:0;z-index:20}
-  header.top h1{font-size:16px;margin:0;font-weight:650;flex:1;min-width:200px}
-  header.top .sub{font-size:12px;opacity:.8;font-weight:400;display:block}
-  .tabs{display:flex;gap:4px;flex-wrap:wrap}
-  .tab{padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;color:#d9eadf}
-  .tab.active{background:#fff;color:var(--brand)}
-  .net{font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;white-space:nowrap}
-  .net.on{background:rgba(255,255,255,.15);color:#c9f0d6}.net.off{background:#f6c343;color:#3b2a00}
-  #btnRefresh.pending{background:#f6c343;color:#3b2a00;border-color:#f6c343}
-  .pend{font-size:11px;font-weight:700;color:#8a5b00;background:#fff1d6;border-radius:10px;padding:1px 7px}
-  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap}
-  .btn:hover{filter:brightness(.96)}
-  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-  .btn.green{background:var(--brand2);border-color:var(--brand2);color:#fff}
-  .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
-  .btn.sm{padding:4px 8px;font-size:12px}
-  .btn.lg{padding:11px 22px;font-size:15px}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  main{padding:14px 18px 40px;max-width:1500px;margin:0 auto}
+  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;font-variant-numeric:tabular-nums}
+  /* ---------- header ---------- */
+  header.top{background:var(--black);color:#fff;border-bottom:4px solid var(--lime);position:sticky;top:0;z-index:20}
+  header.top .wrap{max-width:1500px;margin:0 auto;padding:14px 22px 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  header.top .titles{flex:1;min-width:240px}
+  header.top .kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--lime)}
+  header.top h1{font-size:26px;margin:4px 0 2px;font-weight:700;letter-spacing:.005em}
+  header.top .sub{font-size:13px;color:#a8a8a8}
+  .hbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .tab{padding:7px 14px;border:1px solid #3a3a3a;border-radius:3px;cursor:pointer;font-size:13.5px;color:#ddd}
+  .tab:hover{border-color:var(--lime);color:#fff}
+  .tab.active{background:var(--lime);border-color:var(--lime);color:var(--black);font-weight:700}
+  .net{font-size:12px;padding:5px 10px;border-radius:3px;white-space:nowrap;border:1px solid #3a3a3a}
+  .net.on{color:var(--lime)}.net.off{background:var(--amber);border-color:var(--amber);color:#1a1a1a;font-weight:700}
+  #btnRefresh.pending{background:var(--amber);color:#1a1a1a;border-color:var(--amber)}
+  .pend{font-size:11px;font-weight:700;color:#7a4b00;background:#fdf0d9;border:1px solid #f3cf93;border-radius:3px;padding:1px 6px}
+  /* ---------- buttons ---------- */
+  .btn{font-family:var(--serif);border:1px solid var(--line2);background:#fff;color:var(--ink);border-radius:3px;padding:8px 14px;font-size:13.5px;cursor:pointer;font-weight:700;white-space:nowrap}
+  .btn:hover{border-color:var(--olive);color:var(--olive)}
+  .btn.primary,.btn.green{background:var(--olive);border-color:var(--olive);color:#fff}
+  .btn.primary:hover,.btn.green:hover{background:#4c6a00;color:#fff}
+  .btn.ghost{background:transparent;color:#fff;border-color:#5a5a5a}
+  .btn.ghost:hover{border-color:var(--lime);color:var(--lime)}
+  .btn.outline{background:#fff;border-color:var(--lime);color:var(--olive)}
+  .btn.outline:hover{background:var(--soft)}
+  .btn.sm{padding:5px 10px;font-size:12.5px}
+  .btn.lg{padding:12px 26px;font-size:16px;letter-spacing:.02em}
+  .btn:disabled{opacity:.45;cursor:not-allowed}
+  .btn.print{background:var(--soft);border:1px solid var(--lime);color:var(--olive);padding:5px 11px;font-size:12.5px}
+  .btn.print:hover{background:var(--lime);color:var(--black)}
+  main{padding:20px 22px 48px;max-width:1500px;margin:0 auto}
   .hidden{display:none!important}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
-  .card h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
-  input,select{width:100%;padding:7px 9px;border:1px solid #cdd5cb;border-radius:7px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
-  input:focus,select:focus{outline:2px solid #9cc9ae;border-color:var(--brand2)}
-  label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;font-weight:650;text-transform:uppercase;letter-spacing:.03em}
-  .muted{color:var(--muted)} .hint{font-size:12px;color:var(--muted)}
-  table{width:100%;border-collapse:collapse;font-size:13px}
-  th,td{padding:6px 7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-  th{background:#f1f3ef;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#4c574f;white-space:nowrap}
+  /* ---------- cards & fields ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:18px 20px;min-width:0}
+  .card h2{margin:0 0 12px;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:400}
+  .card h2.title{font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:700;margin-bottom:14px}
+  input,select{width:100%;padding:9px 10px;border:1px solid var(--line2);border-radius:3px;font-family:var(--serif);font-size:14.5px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(141,182,0,.25)}
+  select:disabled{background:#f7f7f7;color:#555}
+  label{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.14em}
+  .req{color:var(--red)}
+  .muted{color:var(--muted)} .hint{font-size:12.5px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{background:#f7f7f7;font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:400;white-space:nowrap}
   td.n,th.n{text-align:right;white-space:nowrap}
-  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
-  .entry{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:14px;align-items:start}
+  td.n{font-family:var(--mono)}
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:3px;background:#fff}
+  .entry{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
   @media(max-width:1100px){.entry{grid-template-columns:1fr}}
-  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .frow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+  .frow .s2{grid-column:span 2}.frow .s4{grid-column:1/-1}
+  @media(max-width:760px){.frow{grid-template-columns:1fr 1fr}.frow .s2{grid-column:1/-1}}
   .span2{grid-column:span 2} @media(max-width:520px){.span2{grid-column:span 1}}
-  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em}
-  .switch{display:flex!important;align-items:center;gap:8px;margin-top:6px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:12.5px!important;color:var(--ink)!important;user-select:none}
+  .docpair{display:flex;gap:6px}.docpair select{width:84px;flex:none}
+  .verifybar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;background:#fafcf3;border:1px dashed var(--lime);border-radius:3px;padding:12px 14px;margin:-2px 0 14px}
+  .verifybar .vf{min-width:150px;flex:0 0 180px}
+  .verifybar .vf.idf{flex:0 0 160px}
+  .badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.06em;border:1px solid transparent}
+  .switch{display:flex!important;align-items:center;gap:10px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important;user-select:none;margin:0!important;flex:1;min-width:240px}
   .switch.hidden{display:none!important}
   .switch input{display:none}
-  .switch .slider{position:relative;width:38px;height:21px;border-radius:21px;background:#c9cfc7;flex:none;transition:background .15s}
-  .switch .slider::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .15s}
-  .switch input:checked + .slider{background:var(--brand2)}
-  .switch input:checked + .slider::after{left:19px}
-  .b-WALKIN{background:#fff1d6;color:#8a5b00}.b-OK{background:#d9f2e1;color:#16683b}.b-NO{background:#fbe0dc;color:#a2321f}.b-EMP{background:#e3eefb;color:#1e4f8a}.b-VOLUMEBUYER{background:#e2f3e8;color:#1f6b43}
-  .catrow{display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap}
-  .catrow select{width:auto;padding:3px 6px;font-size:12px}
-  .lines input{padding:6px 7px}
-  .lines td{padding:4px 5px}
-  .lines .amt{font-weight:700;font-size:14px}
-  .unit{font-size:11px;color:var(--muted)}
-  .warn{font-size:11px;color:var(--accent)}
-  .totalbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:12px 14px;background:var(--soft);border-radius:10px}
-  .grand{font-size:26px;font-weight:800;color:var(--brand)}
-  .glabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
-  .big{font-size:24px;font-weight:800}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-  .stat{background:var(--soft);border-radius:10px;padding:10px 12px}
-  .stat .v{font-size:20px;font-weight:800;margin-top:2px}
-  .stat.main{background:var(--brand);color:#fff}.stat.main .glabel{color:#cfe5d7}
-  .sub-tot td{font-weight:700;background:#fafbf8}
-  .ctrl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);font-weight:700}
-  .bar{height:8px;background:var(--brand2);border-radius:4px;min-width:2px}
+  .switch .slider{position:relative;width:44px;height:24px;border-radius:24px;background:#c9c9c9;flex:none;transition:background .15s}
+  .switch .slider::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .15s}
+  .switch input:checked + .slider{background:var(--olive)}
+  .switch input:checked + .slider::after{left:23px}
+  .switch b{display:block;font-size:14px}.switch small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+  .b-WALKIN{background:#fdf0d9;color:#7a4b00;border-color:#f3cf93}.b-OK{background:var(--soft);color:var(--olive);border-color:var(--lime)}.b-NO{background:#fdecea;color:var(--red);border-color:#f5b5ae}
+  .b-EMP{background:#eaf1fb;color:var(--blue);border-color:#b9cfee}.b-VOLUMEBUYER{background:var(--soft);color:var(--olive);border-color:#cfe39a}
+  .catrow{display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap}
+  .lines input{padding:7px 8px}
+  .lines td{padding:5px 6px}
+  .lines .amt{font-weight:700;font-size:15px;font-family:var(--mono)}
+  .unit{font-size:11.5px;color:var(--muted);margin-top:2px}
+  .warn{font-size:11.5px;color:var(--red)}
+  .totalbar{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-top:16px;padding:14px 18px;background:#fafafa;border:1px solid var(--line);border-top:3px solid var(--lime);border-radius:3px}
+  .grand{font-size:30px;font-weight:700;color:var(--ink);font-family:var(--mono)}
+  .glabel{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.16em}
+  .big{font-size:24px;font-weight:700;font-family:var(--mono)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+  .stat{background:#fff;border:1px solid var(--line);border-top:3px solid #d9d9d9;border-radius:3px;padding:12px 14px}
+  .stat .v{font-size:21px;font-weight:700;margin-top:6px;font-family:var(--mono)}
+  .stat.main{border-top-color:var(--lime)}.stat.dark{border-top-color:var(--black)}
+  .stat.main .glabel{color:var(--muted)}
+  .sub-tot td{font-weight:700;background:#fafafa}
+  .grp td{background:#fbfcf6;border-top:1px solid #dfe8c3}
+  .ctrl{font-family:var(--mono);font-size:13px;color:var(--olive);font-weight:700}
+  .bar{height:8px;background:var(--lime);border-radius:2px;min-width:2px}
   .daily{font-size:13px;border-collapse:collapse;min-width:980px}
-  .daily th,.daily td{border:1px solid #c9d3e0;padding:5px 8px;white-space:nowrap}
-  .daily thead th{color:#fff;text-transform:none;letter-spacing:0;font-size:13px;text-align:center;font-weight:700}
-  .daily .hAll{background:#1f4e79}.daily .hCash{background:#5b8c32}.daily .hCred{background:#c55a11}
-  .daily td{text-align:right}.daily td.l{text-align:left}
-  .daily tr.tot td{background:#fbe3d6;font-weight:800}
-  .daily tr.avg td{background:#dde9f6;font-weight:800}
-  .daily tr.shr td{background:#e9f0f8;font-weight:800}
-  .daily tr.today td{color:#1f6fb8;font-weight:700}
-  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
-  .ltabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-  .ltab{padding:7px 12px;border-radius:8px;cursor:pointer;background:#e6ebe4;font-weight:600;font-size:13px}
-  .ltab.active{background:var(--brand);color:#fff}
-  .ltab.sm{padding:5px 10px;font-size:12px}
-  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
-  .ledit td{padding:3px 4px}.ledit input,.ledit select{padding:5px 7px;font-size:13px}
-  .overlay{position:fixed;inset:0;background:rgba(20,30,24,.45);display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 10px}
-  .modal{background:#fff;border-radius:12px;width:min(820px,100%);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .daily th,.daily td{border:1px solid #dcdcdc;padding:6px 9px;white-space:nowrap}
+  .daily thead th{color:#fff;text-transform:none;letter-spacing:.02em;font-size:13px;text-align:center;font-weight:700}
+  .daily .hAll{background:#1a1a1a}.daily .hCash{background:var(--olive)}.daily .hCred{background:#b45309}
+  .daily td{text-align:right;font-family:var(--mono)}.daily td.l{text-align:left;font-family:var(--serif)}
+  .daily tr.tot td{background:var(--soft);font-weight:700}
+  .daily tr.avg td{background:#f2f2f2;font-weight:700}
+  .daily tr.shr td{background:#fafafa;font-weight:700}
+  .daily tr.today td{color:var(--olive);font-weight:700}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .ltabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .ltab{padding:7px 13px;border:1px solid var(--lime);border-radius:3px;cursor:pointer;background:#fff;color:var(--olive);font-size:13.5px}
+  .ltab.active{background:var(--olive);border-color:var(--olive);color:#fff;font-weight:700}
+  .ltab.sm{padding:5px 10px;font-size:12.5px}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+  .ledit td{padding:3px 4px}.ledit input,.ledit select{padding:6px 8px;font-size:13.5px}
+  .overlay{position:fixed;inset:0;background:rgba(13,13,13,.55);display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 10px}
+  .modal{background:#fff;border-radius:3px;width:min(820px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}
   .modal.wide{width:min(900px,100%)}
-  .modal .mh{background:var(--brand);color:#fff;padding:10px 16px;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:8px}
-  .modal .mh h3{margin:0;font-size:15px;flex:1}
-  .modal .body{padding:14px 16px}
-  .modal .foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-  .toast{position:fixed;bottom:18px;right:18px;background:#1b2620;color:#fff;padding:10px 14px;border-radius:8px;z-index:99;font-size:13px;max-width:420px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
-  .toast.err{background:#a2321f}
-  .iconbtn{border:none;background:none;cursor:pointer;font-size:14px;padding:2px 4px;color:var(--muted)}
+  .modal .mh{background:var(--black);color:#fff;padding:12px 16px;border-bottom:3px solid var(--lime);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .modal .mh h3{margin:0;font-size:17px;flex:1}
+  .modal .body{padding:16px 18px}
+  .modal .foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--black);color:#fff;border-left:4px solid var(--lime);padding:11px 15px;border-radius:3px;z-index:99;font-size:13.5px;max-width:440px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  .toast.err{border-left-color:#ff6b5b;background:#2a0f0c}
+  .iconbtn{border:none;background:none;cursor:pointer;font-size:15px;padding:2px 5px;color:var(--muted2)}
   .iconbtn:hover{color:var(--ink)}
-  .drop{border:2px dashed #b9c8bb;border-radius:10px;padding:14px;text-align:center;background:#fafcf9}
+  .drop{border:1px dashed var(--line2);border-radius:3px;padding:16px;text-align:center;background:#fafafa}
+  .banner{border:1px solid #f5b5ae;background:#fdecea;color:#8a1c12;padding:10px 12px;border-radius:3px;font-weight:700}
 
   /* ---------- printable slip ---------- */
   .slipwrap{background:#e9ece7;padding:16px;border-radius:0 0 12px 12px;max-height:72vh;overflow:auto}
-  .slip{background:#fff;color:#111;width:100%;max-width:780px;margin:0 auto;padding:28px 34px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+  .slip{background:#fff;color:#111;width:100%;max-width:780px;margin:0 auto;padding:28px 34px;font-family:var(--font);font-size:12.5px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
   .slip .sh{display:flex;justify-content:space-between;align-items:center;gap:20px}
   .slip .sh img{height:74px}
   .slip .co{text-align:right}
@@ -127,7 +160,7 @@
   .slip .sign b{display:block;font-size:12.5px;padding-bottom:3px;border-bottom:1px solid #333;min-height:20px}
   .slip .sign span{display:block;padding-top:4px}
   .slip .foot{margin-top:18px;font-size:10.5px;color:#666;display:flex;justify-content:space-between}
-  .auth{background:#fff;color:#111;width:100%;max-width:780px;margin:18px auto 0;padding:34px 40px 40px;font-family:Arial,Helvetica,sans-serif;font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
+  .auth{background:#fff;color:#111;width:100%;max-width:780px;margin:18px auto 0;padding:34px 40px 40px;font-family:var(--font);font-size:13px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
   .auth .ah{display:flex;justify-content:space-between;align-items:flex-start}
   .auth .lbox{border:1.5px solid #333;padding:10px 26px}
   .auth .lbox img{height:62px;display:block}
@@ -159,22 +192,28 @@
 </style>
 </head>
 <body>
-<header class="top">
-  <h1>Sales Meat &amp; Livestock — Sales Entry<span class="sub" id="status">Loading…</span></h1>
-  <div class="tabs">
-    <div class="tab active" data-tab="entry">Enter Sales</div>
-    <div class="tab" data-tab="summary">Summary</div>
-    <div class="tab" data-tab="lists">Rates &amp; Lists</div>
+<header class="top"><div class="wrap">
+  <div class="titles">
+    <div class="kicker">M. Montesclaros Farms Inc. — Sales Meat &amp; Livestock</div>
+    <h1>Sales Entry</h1>
+    <div class="sub" id="status">Loading…</div>
   </div>
-  <span class="net on" id="netPill">● Online</span>
-  <button class="btn ghost" id="btnRefresh" title="Upload sales saved offline and reload from the Google Sheet">⟳ Sync</button>
-  <button class="btn ghost" id="btnSettings" title="Settings">⚙</button>
-  <a class="btn ghost hidden" id="lnkSheet" target="_blank" style="text-decoration:none">Sheet ↗</a>
-</header>
+  <div class="hbtns">
+    <div class="tabs">
+      <div class="tab active" data-tab="entry">Enter Sales</div>
+      <div class="tab" data-tab="summary">Summary</div>
+      <div class="tab" data-tab="lists">Rates &amp; Lists</div>
+    </div>
+    <span class="net on" id="netPill">● Online</span>
+    <button class="btn ghost" id="btnRefresh" title="Upload sales saved offline and reload from the Google Sheet">⟳ Sync</button>
+    <button class="btn ghost" id="btnSettings" title="Settings">⚙</button>
+    <a class="btn ghost hidden" id="lnkSheet" target="_blank" style="text-decoration:none">Sheet ↗</a>
+  </div>
+</div></header>
 
 <main>
-  <div id="connectBox" class="card hidden" style="background:#fff6e0;border-color:#f0d58a;margin-bottom:12px">
-    <h2 style="color:#7a5a00">Connect to your Google Sheet</h2>
+  <div id="connectBox" class="card hidden" style="border-top:3px solid var(--amber);margin-bottom:16px">
+    <h2 class="title">Connect to your Google Sheet</h2>
     <p class="hint" style="margin-top:0">Type the <b>access key</b> (API_KEY in Code.gs). It is saved only in this browser.</p>
     <div class="fgrid">
       <div class="span2"><label>Web app URL</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
@@ -190,22 +229,30 @@
     <div class="entry">
       <div class="card">
         <h2>New sale</h2>
-        <div class="fgrid">
+        <div class="frow">
           <div><label>Date</label><input type="date" id="eDate"></div>
           <div><label>Representative</label><select id="eRep"></select></div>
           <div><label>Customer category</label>
-            <select id="eCat"><option value="W">Walk-in</option><option value="V">Volume buyer</option><option value="E">Salary deduction (employee)</option></select>
-            <label class="switch hidden" id="eVerifyBox" title="ON = only regular employees in the Employees list can avail salary deduction">
-              <input type="checkbox" id="eVerify"><span class="slider"></span><span id="eVerifyTxt">Verify with employee list</span></label></div>
-          <div id="eBUBox" class="hidden"><label>Business unit</label><select id="eBU"></select></div>
-          <div class="span2"><label>Customer</label>
+            <select id="eCat"><option value="W">Walk-in</option><option value="V">Volume buyer</option><option value="E">Salary deduction</option></select></div>
+          <div><label>DR / IND # <span class="req">*</span></label>
+            <div class="docpair"><select id="eDocType"><option value="DR">DR</option><option value="IND">IND</option></select><input id="eDocNo" placeholder="Number"></div></div>
+        </div>
+
+        <div class="verifybar hidden" id="eVerifyBar">
+          <label class="switch" id="eVerifyBox" title="ON = only regular employees in the Employees list can avail salary deduction">
+            <input type="checkbox" id="eVerify"><span class="slider"></span>
+            <span><b id="eVerifyTxt">Verify with employee list</b><small id="eVerifySub"></small></span></label>
+          <div class="vf" id="eBUBox"><label>Business unit <span class="req">*</span></label><select id="eBU"></select></div>
+          <div class="vf idf" id="eEmpNoBox"><label>ID # (for ATD) <span class="req">*</span></label><input id="eEmpNo" placeholder="Employee ID"></div>
+        </div>
+
+        <div class="frow">
+          <div class="s2"><label>Customer <span class="req">*</span></label>
             <input id="eCust" list="dl-customers" placeholder="Type or pick a name" autocomplete="off">
             <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span><span class="hint" id="eCatWhy"></span></div></div>
           <div><label>Mode of payment</label><select id="eMode"></select></div>
           <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
-          <div><label>DR / IND # <span style="color:var(--accent)">*</span></label>
-            <div style="display:flex;gap:6px"><select id="eDocType" style="width:78px;flex:none"><option value="DR">DR</option><option value="IND">IND</option></select><input id="eDocNo" placeholder="Number"></div></div>
-          <div class="span2"><label>Remarks</label><input id="eRemarks"></div>
+          <div class="s4"><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div>
         </div>
 
         <div style="margin-top:14px" class="tablewrap">
@@ -215,7 +262,7 @@
           </table>
         </div>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
-          <button class="btn sm" id="addLine">+ Add product line</button>
+          <button class="btn sm outline" id="addLine">+ Add product line</button>
           <span class="hint">Enter = next field · Ctrl+Enter = save</span>
           <span style="flex:1"></span>
           <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink);margin:0"><input type="checkbox" id="ePrintAfter" style="width:auto"> Show print slip after saving</label>
@@ -234,7 +281,7 @@
 
       <div class="card">
         <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
-          <div style="flex:1"><h2 style="margin:0">Entries for</h2></div>
+          <div style="flex:1;align-self:center"><h2 style="margin:0">Entries for</h2></div>
           <div style="width:170px"><input type="date" id="dDate"></div>
         </div>
         <div class="stats" id="dayStats"></div>
@@ -486,6 +533,9 @@ const IDB = (() => {
   };
 })();
 let ONLINE = true, OUTBOX = [], POOL = [], CACHE_AT = 0;
+// speed: by default only this month + last month are downloaded; Summary "All" loads the full history once
+let FULL_HISTORY = false, DATA_SINCE = '', LAST_MS = 0;
+function recentSince(){ const d = new Date(); return isoOf(new Date(d.getFullYear(), d.getMonth() - 1, 1)); }
 async function loadDeviceState(){ try { OUTBOX = (await IDB.get('outbox')) || []; POOL = (await IDB.get('pool')) || []; } catch(e){} updateNet(); }
 const saveOutbox = () => IDB.set('outbox', OUTBOX).catch(() => toast('Could not store the offline sale on this device!', true));
 const savePool = () => IDB.set('pool', POOL).catch(() => {});
@@ -546,7 +596,8 @@ async function load(silent){
   if (!silent) $('status').textContent = 'Loading…';
   try {
     let d, fromCache = false;
-    try { d = await api('getData', LISTS_V); setOnline(true); }
+    const t0 = performance.now();
+    try { d = await api('getData', LISTS_V, {since: FULL_HISTORY ? '' : recentSince()}); setOnline(true); LAST_MS = performance.now() - t0; }
     catch (err){
       if (!err.offline) throw err;
       setOnline(false);
@@ -564,15 +615,20 @@ async function load(silent){
     if (!fromCache && d.listsEmpty) await initLists(d.legacyLists);
     if (!fromCache){
       CACHE_AT = Date.now();
-      IDB.set('cache', {d: {keys: d.keys, rows: d.rows, config: d.config, url: d.url}, lists: LISTS, at: CACHE_AT}).catch(() => {});
+      DATA_SINCE = d.since || '';
+      // keep an offline copy, but do it when the browser is idle so typing never stutters
+      const snap = {d: {keys: d.keys, rows: d.rows, config: d.config, url: d.url, since: d.since}, lists: LISTS, at: CACHE_AT};
+      (window.requestIdleCallback || (f => setTimeout(f, 1500)))(() => IDB.set('cache', snap).catch(() => {}));
       refillPool();
     }
     ROWS = ROWS.concat(pendingRows());
-    buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters(); renderSummary();
+    if (fromCache) DATA_SINCE = d.since || '';
+    buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters(); if (summaryVisible()) renderSummary();
     if ((listsChanged || fromCache) && !LEDIT.dirty) openList(LEDIT.key);
     const t = d => new Date(d).toLocaleString([], {month:'short', day:'numeric', hour:'2-digit', minute:'2-digit'});
     $('status').textContent = fromCache ? 'OFFLINE · showing data saved ' + t(CACHE_AT) + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '')
-      : ROWS.length.toLocaleString() + ' sales lines · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '');
+      : ROWS.length.toLocaleString() + ' sales lines' + (DATA_SINCE ? ' since ' + fmtDate(DATA_SINCE) : ' (all history)') + ' · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) +
+        (LAST_MS ? ' · ' + (LAST_MS / 1000).toFixed(1) + 's' : '') + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '');
   } catch (e){
     $('status').textContent = 'Error loading';
     const msg = e.message || String(e);
@@ -593,7 +649,7 @@ async function initLists(legacy){
 }
 
 /* ================= ENTRY FORM ================= */
-let lastAutoCust = '';
+let lastAutoCust = '', lastEmpFill = '', autoEmpNo = '', custTimer = null;
 function catCode(){ return $('eCat').value || 'W'; }
 function lineHtml(){
   return '<tr><td><input data-l="particulars" list="dl-products" placeholder="Product / particulars" autocomplete="off"><div class="unit" data-info></div></td>' +
@@ -610,7 +666,9 @@ function effective(){
   if (c === 'V') return {cat: CAT.volume, vb: IDX.vb.get(key(name))};
   if (c === 'E') {
     const emp = name ? findEmployee(name) : null, regular = emp ? isRegular(emp, $('eDate').value) : false;
-    return {cat: CAT.employee, emp, regular, verified: !!emp && regular, company: emp ? emp.company : (verifyOn() ? '' : $('eBU').value)};
+    if (verifyOn()) return {cat: CAT.employee, emp, regular, verified: !!emp && regular, company: emp ? emp.company : '', empNo: emp ? emp.empNo || '' : ''};
+    // verification OFF: business unit and ID # are typed by hand (ID # is used on the Authority to Deduct)
+    return {cat: CAT.employee, emp, regular, verified: false, manual: true, company: $('eBU').value, empNo: $('eEmpNo').value.trim()};
   }
   return {cat: CAT.walkin, known: !!name && CUSTS.W.has(key(name))};
 }
@@ -620,16 +678,28 @@ function onCustomer(keepMode){
   if (c === 'W'){ badge = 'WALK-IN'; cls = 'b-WALKIN'; why = !name ? 'Suggestions show past walk-in customers' : e.known ? 'Repeat walk-in customer' : 'New walk-in customer'; }
   else if (c === 'V'){ badge = 'VOLUME BUYER'; cls = 'b-VOLUMEBUYER';
     why = !name ? 'Pick from the Volume Buyers list or type a new name' : e.vb ? 'In Volume Buyers list' + (e.vb.mode ? ' · usually ' + (isCredit(e.vb.mode) ? 'Credit' : 'Cash') : '') + (num(e.vb.terms) ? ' · ' + e.vb.terms + ' days' : '') : 'New volume buyer (not in the list)'; }
-  else if (!name){ badge = 'SALARY DEDUCTION'; cls = 'b-EMP'; why = V ? 'Only regular employees in the Employees list can avail' : 'Verification is OFF (Settings)'; }
-  else if (!e.emp){ badge = V ? '✖ NOT IN EMPLOYEES LIST' : 'SALARY DEDUCTION · ' + $('eBU').value; cls = V ? 'b-NO' : 'b-EMP'; why = V ? 'Salary deduction is only for employees in the list' : 'Not in the list — verification is OFF'; }
+  else if (!name){ badge = 'SALARY DEDUCTION'; cls = 'b-EMP'; why = V ? 'Only regular employees in the Employees list can avail' : 'Verification OFF — type the employee name, business unit and ID #'; }
+  else if (!V){ badge = 'SALARY DEDUCTION · ' + $('eBU').value; cls = 'b-EMP'; why = 'Verification OFF' + ($('eEmpNo').value.trim() ? ' · ID # ' + $('eEmpNo').value.trim() : ' · type the ID # above'); }
+  else if (!e.emp){ badge = '✖ NOT IN EMPLOYEES LIST'; cls = 'b-NO'; why = 'Salary deduction is only for employees in the list'; }
   else if (!e.regular){ badge = (V ? '✖ NOT YET REGULAR · ' : 'NOT REGULAR · ') + e.emp.company; cls = V ? 'b-NO' : 'b-EMP';
     why = 'Emp# ' + (e.emp.empNo || '—') + ' · ' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization'); }
   else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular)); }
   $('eCatBadge').textContent = badge; $('eCatBadge').className = 'badge ' + cls; $('eCatWhy').textContent = why;
-  $('eBUBox').classList.toggle('hidden', !(c === 'E' && !V && !e.emp));
-  $('eVerifyBox').classList.toggle('hidden', c !== 'E');
+  $('eVerifyBar').classList.toggle('hidden', c !== 'E');
+  if (c === 'E') $('eCust').placeholder = V ? 'Employee name (must be in the Employees list)' : 'Employee name';
+  $('eBUBox').classList.toggle('hidden', V);
+  $('eEmpNoBox').classList.toggle('hidden', V);
   $('eVerify').checked = V;
-  $('eVerifyTxt').textContent = V ? 'Verify with employee list: ON' : 'Verify with employee list: OFF — any name allowed';
+  $('eVerifyTxt').textContent = V ? 'Verify with employee list — ON' : 'Verify with employee list — OFF';
+  $('eVerifySub').textContent = V ? 'Only regular employees in the list can avail. ID # comes from the list.' : 'Any name allowed. Choose the business unit and type the ID # for the Authority to Deduct.';
+  if (c === 'E' && !V){
+    // an ID # that was filled in automatically belongs to that name only — clear it when the name changes
+    if (autoEmpNo && lastEmpFill !== key(name) && $('eEmpNo').value.trim() === autoEmpNo){ $('eEmpNo').value = ''; autoEmpNo = ''; lastEmpFill = ''; }
+    if (e.emp && lastEmpFill !== key(name)){   // name is in the list → pre-fill business unit and ID #
+      lastEmpFill = key(name); $('eBU').value = e.emp.company;
+      if (!$('eEmpNo').value.trim()){ $('eEmpNo').value = e.emp.empNo || ''; autoEmpNo = e.emp.empNo || ''; }
+    }
+  }
   const ck = c + '|' + (c === 'V' ? key(name) : '');
   if ((!keepMode || !$('eMode').value) && ck !== lastAutoCust){
     lastAutoCust = ck;
@@ -691,12 +761,13 @@ function buildRows(){
     if (verifyOn() && !e.emp) errs.push('salary deduction is only for employees in the Employees list');
     else if (verifyOn() && !e.regular) errs.push('salary deduction is only for REGULAR employees (' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization') + ')');
     else if (!e.company) errs.push('business unit');
+    if (!verifyOn() && !e.empNo) errs.push('ID # for the Authority to Deduct');
   }
   if (!lines.length) errs.push('at least one product line');
   lines.forEach((v, i) => { if (!v.particulars || !v.amount || !v.weight) errs.push('line ' + (i+1) + ' (product, weight and rate)'); });
   if (errs.length) return {errs};
   let remarks = $('eRemarks').value.trim();
-  if (e.cat === CAT.employee) remarks = '[' + e.company + ']' + (e.emp && e.emp.empNo ? ' EMP# ' + e.emp.empNo : '') + (e.emp && e.emp.dept ? ' · ' + e.emp.dept : '') + (remarks ? ' | ' + remarks : '');
+  if (e.cat === CAT.employee) remarks = '[' + e.company + ']' + (e.empNo ? ' EMP# ' + e.empNo : '') + (e.emp && e.emp.dept && !e.manual ? ' · ' + e.emp.dept : '') + (remarks ? ' | ' + remarks : '');
   const rows = lines.map(v => {
     const pay = credit ? 0 : v.amount, bal = r2(v.amount - pay);
     return {rep: $('eRep').value, source: SOURCE, custCat: e.cat, date, month: MONTHS[+date.slice(5,7) - 1], customer: $('eCust').value.trim(),
@@ -706,15 +777,17 @@ function buildRows(){
       due, daysOverdue: bal > 0 && due ? Math.max(0, daysBetween(due, today)) : '-',
       payStatus: bal <= 0.005 ? 'PAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks};
   });
-  return {rows, info: {emp: e.emp, company: e.company}};
+  const empInfo = e.cat !== CAT.employee ? null : e.manual ? {empNo: e.empNo, name: $('eCust').value.trim(), payroll: e.emp && e.emp.payroll, position: e.emp && e.emp.position, dept: e.emp && e.emp.dept} : e.emp;
+  return {rows, info: {emp: empInfo, company: e.company}};
 }
 function clearForm(){
-  ['eCust','eDocNo','eRemarks'].forEach(id => $(id).value = '');
-  lastAutoCust = '';
+  ['eCust','eDocNo','eRemarks','eEmpNo'].forEach(id => $(id).value = '');
+  lastAutoCust = ''; lastEmpFill = ''; autoEmpNo = '';
   $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
   $('eCust').focus();
 }
 async function saveSale(){
+  if (custTimer){ clearTimeout(custTimer); custTimer = null; onCustomer(); }   // finish the name check first
   const b = buildRows();
   if (b.errs) return toast('Please check: ' + b.errs.join('; '), true);
   const btn = $('btnSave'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -735,7 +808,7 @@ async function saveSale(){
     $('dDate').value = $('eDate').value;
     clearForm();
     ROWS = ROWS.filter(r => !r._pending).concat(pendingRows());
-    renderDay(); renderSummary();
+    renderDay(); if (summaryVisible()) renderSummary();
     if ($('ePrintAfter').checked) openSlip(ROWS.filter(r => r._uid === uid), b.info);
     btn.disabled = false; btn.textContent = 'Save sale';
     return;
@@ -745,7 +818,11 @@ async function saveSale(){
     toast('Saved ' + res.control + ' · ' + b.rows.length + ' line(s) · ' + peso(total) + ' ✓');
     $('dDate').value = $('eDate').value;
     clearForm();
-    await load(true);
+    if (res.firstRow){   // show the new sale right away — no full reload needed
+      b.rows.forEach((r, i) => ROWS.push(enrich(Object.assign({}, r, {_row: res.firstRow + i, [CONTROL_FIELD]: res.control}))));
+      renderDay(); if (summaryVisible()) renderSummary();
+      if (b.rows.some(r => !CUSTS[r.custCat === CAT.walkin ? 'W' : r.custCat === CAT.volume ? 'V' : 'E'].has(key(r.customer)))) buildIndex();
+    } else await load(true);
     if ($('ePrintAfter').checked){
       const rows = ROWS.filter(r => r._ctrl === res.control);
       openSlip(rows.length ? rows : b.rows.map(r => enrich(Object.assign({_row:0}, r, {[CONTROL_FIELD]: res.control}))), b.info);
@@ -755,11 +832,21 @@ async function saveSale(){
 }
 
 /* ================= PRINTABLE SLIP ================= */
+/** Employee details for printing: from the save, else the Employees list, else the ID # stored in Remarks. */
+function empFor(r0, info){
+  let emp = info && info.emp;
+  if (!emp || !emp.empNo){
+    const m = /EMP#\s*([^\s·|]+)/.exec(r0.remarks || '');
+    const fromList = findEmployee(r0.customer);
+    if (m) emp = Object.assign({}, fromList || {}, emp || {}, {empNo: m[1], name: (emp && emp.name) || r0.customer});
+    else if (!emp) emp = fromList;
+  }
+  return emp;
+}
 function slipHtml(rows, info){
   const s = settings(), r0 = rows[0];
   const isEmp = r0.custCat === CAT.employee;
-  let emp = info && info.emp, company = (info && info.company) || companyOf(r0);
-  if (isEmp && !emp) emp = findEmployee(r0.customer);
+  let emp = isEmp ? empFor(r0, info) : null, company = (info && info.company) || companyOf(r0);
   const ctrl = r0._ctrl || r0[CONTROL_FIELD] || '—';
   const lines = rows.map((r, i) => {
     const rf = IDX.rate.get(key(r.particulars));
@@ -800,8 +887,7 @@ function slipHtml(rows, info){
 function longDate(iso){ if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return iso || ''; const [y,m,d] = iso.split('-'); return MONTHS[+m-1] + ' ' + (+d) + ', ' + y; }
 function authHtml(rows, info){
   const s = settings(), r0 = rows[0];
-  let emp = info && info.emp, company = (info && info.company) || companyOf(r0);
-  if (!emp) emp = findEmployee(r0.customer);
+  let emp = empFor(r0, info), company = (info && info.company) || companyOf(r0);
   if (!company && emp) company = emp.company;
   const total = rows.reduce((a, r) => a + r._amt, 0);
   const grp = ((emp && emp.payroll) || '') + ' ' + ((emp && emp.position) || '');
@@ -829,7 +915,7 @@ function openSlip(rows, info){
   const chk = (id, label, on) => '<label style="color:#fff;display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-size:13px"><input type="checkbox" id="' + id + '" style="width:auto"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Print · Control No. ' + esc(rows[0]._ctrl || '') + '</h3>' +
     chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) : '') +
-    '<button class="btn green sm" id="doPrint">🖨 Print</button><button class="btn ghost sm" data-x>✕</button></div>' +
+    '<button class="btn green" id="doPrint" style="font-size:15px;padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap">' + slip + auth + '</div></div></div>';
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => {
@@ -854,15 +940,15 @@ function renderDay(){
   const tot = rows.reduce((a, r) => a + r._amt, 0), kg = rows.reduce((a, r) => a + r._kg, 0);
   const byCat = sumBy(rows, r => r.custCat === CAT.employee ? 'EMPLOYEE' + (companyOf(r) ? ' · ' + companyOf(r) : '') : r.custCat, r => r._amt);
   $('dayStats').innerHTML = '<div class="stat main"><div class="glabel">Total amount</div><div class="v">' + peso(tot) + '</div></div>' +
-    '<div class="stat"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
+    '<div class="stat dark"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
     [...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="stat"><div class="glabel">' + esc(c) + '</div><div class="v" style="font-size:16px">' + peso(v) + '</div></div>').join('');
   if (!rows.length){ $('dayTable').innerHTML = '<tr><td class="muted" style="padding:20px;text-align:center">No entries on ' + fmtDate(d) + '.</td></tr>'; return; }
   let h = '<thead><tr><th>Product</th><th class="n">Kg</th><th class="n">Rate</th><th class="n">Amount</th><th></th></tr></thead><tbody>';
   groupsOf(rows).forEach((list, gk) => {
     const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0);
     const badge = r0.custCat === CAT.employee ? '<span class="badge b-EMP">EMP ' + esc(companyOf(r0)) + '</span>' : '<span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span>';
-    h += '<tr class="sub-tot"><td colspan="3">' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>' : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
-      '<td><button class="iconbtn" data-print="' + esc(gk) + '" title="Print slip">🖨</button></td></tr>';
+    h += '<tr class="sub-tot grp"><td colspan="3">' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>' : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
+      '<td style="text-align:right"><button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
     h += list.map(r => '<tr><td>' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
       '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
   });
@@ -910,7 +996,7 @@ async function delRow(r){
     if (!confirm('Remove this NOT-synced line from this device?\n\n' + r.customer + '\n' + r.particulars + ' · ' + peso(r._amt))) return;
     const sale = OUTBOX.find(s => s.uid === r._uid);
     if (sale){ const i = sale.rows.findIndex(x => x.particulars === r.particulars && num(x.amount) === r._amt); if (i >= 0) sale.rows.splice(i, 1); if (!sale.rows.length) OUTBOX = OUTBOX.filter(s => s !== sale); await saveOutbox(); }
-    ROWS = ROWS.filter(x => !x._pending).concat(pendingRows()); renderDay(); renderSummary(); updateNet(); return;
+    ROWS = ROWS.filter(x => !x._pending).concat(pendingRows()); renderDay(); if (summaryVisible()) renderSummary(); updateNet(); return;
   }
   if (needOnline('Deleting')) return;
   if (!confirm('Delete this line from the Google Sheet?\n\n' + (r._ctrl ? r._ctrl + ' · ' : '') + r.customer + '\n' + r.particulars + ' · ' + kgf(r._kg) + ' kg · ' + peso(r._amt))) return;
@@ -924,6 +1010,7 @@ function fillSummaryFilters(){
   const u = k => [...new Set(ROWS.map(r => r[k]).filter(Boolean))].sort();
   setOpts($('sRep'), u('rep')); setOpts($('sCat'), u('custCat')); setOpts($('sProd'), u('_prod'));
 }
+function summaryVisible(){ return !$('tab-summary').classList.contains('hidden'); }
 function renderSummary(){
   const f = {from:$('sFrom').value, to:$('sTo').value, rep:$('sRep').value, cat:$('sCat').value, prod:$('sProd').value};
   const v = ROWS.filter(r => (!f.from || r._date >= f.from) && (!f.to || r._date <= f.to) && (!f.rep || r.rep === f.rep) && (!f.cat || r.custCat === f.cat) && (!f.prod || r._prod === f.prod));
@@ -1002,6 +1089,7 @@ function setRange(which){
   if (which === 'today'){ $('sFrom').value = t; $('sTo').value = t; }
   else if (which === 'month'){ $('sFrom').value = t.slice(0,8) + '01'; $('sTo').value = t; }
   else { $('sFrom').value = ''; $('sTo').value = ''; }
+  if (which === 'all' && !FULL_HISTORY && ONLINE){ FULL_HISTORY = true; toast('Loading the full sales history…'); load(true).then(renderSummary); return; }
   renderSummary();
 }
 
@@ -1161,6 +1249,7 @@ function openSettings(){
 document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
   ['entry','summary','lists'].forEach(n => $('tab-' + n).classList.toggle('hidden', n !== t.dataset.tab));
+  if (t.dataset.tab === 'summary') renderSummary();
 });
 $('btnRefresh').onclick = syncNow;
 window.addEventListener('online', () => { if (OUTBOX.length) toast('Internet is back — click ⟳ Sync to upload ' + OUTBOX.length + ' sale(s).'); load(true); });
@@ -1176,11 +1265,12 @@ $('cGo').onclick = () => {
   if (!k) { $('cErr').textContent = 'Enter the access key.'; return; }
   store('apiUrl', url); store('apiKey', k); $('cErr').textContent = 'Connecting…'; load();
 };
-$('eCust').addEventListener('input', () => onCustomer());
+$('eCust').addEventListener('input', () => { clearTimeout(custTimer); custTimer = setTimeout(() => onCustomer(), 120); });
 $('eCust').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); onCustomer(); $('lineBody').querySelector('input').focus(); } });
 $('eCat').value = store('cat') || 'W';
 $('eCat').addEventListener('change', () => { store('cat', $('eCat').value); lastAutoCust = ''; $('eCust').value = ''; setCustList(); onCustomer(); $('eCust').focus(); });
 $('eBU').addEventListener('change', () => onCustomer(true));
+$('eEmpNo').addEventListener('input', () => { autoEmpNo = ''; onCustomer(true); });
 $('eVerify').addEventListener('change', () => {
   saveSettings(Object.assign(settings(), {verifyEmp: $('eVerify').checked}));
   toast($('eVerify').checked ? 'Verification ON — only regular employees in the list can avail salary deduction.' : 'Verification OFF — any name can be saved as salary deduction (choose the business unit).');
@@ -1221,7 +1311,10 @@ $('dayTable').addEventListener('click', e => {
   const r = ROWS.find(x => x._row === +(b.dataset.edit || b.dataset.del)); if (!r) return;
   if (b.dataset.edit) openEdit(r); else delRow(r);
 });
-['sFrom','sTo','sRep','sCat','sProd'].forEach(id => $(id).addEventListener('change', renderSummary));
+['sFrom','sTo','sRep','sCat','sProd'].forEach(id => $(id).addEventListener('change', () => {
+  if (id === 'sFrom' && !FULL_HISTORY && DATA_SINCE && $('sFrom').value && $('sFrom').value < DATA_SINCE && ONLINE){ FULL_HISTORY = true; toast('Loading older sales…'); load(true).then(renderSummary); return; }
+  renderSummary();
+}));
 document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => setRange(b.dataset.range));
 $('ltabs').addEventListener('click', e => { const t = e.target.closest('[data-l]'); if (t) openList(t.dataset.l); });
 $('lSearch').addEventListener('input', renderList);
