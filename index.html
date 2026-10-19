@@ -1,384 +1,628 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>MMFI Sales Entry</title>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales Entry — Sales Meat & Livestock</title>
 <style>
   :root{
-    --navy:#0B1526; --navy-soft:#16213A; --slate-bg:#EEF1F6; --card-border:#E2E7EF;
-    --blue:#2563EB; --teal:#0D9488; --amber:#D97706; --red:#DC2626; --green:#059669;
+    --bg:#f3f4f0; --card:#fff; --ink:#1b2620; --muted:#68746c; --line:#e0e4dd;
+    --brand:#1f5f3f; --brand2:#2f8a5c; --accent:#b4432f; --soft:#eef4ef;
   }
-  *{box-sizing:border-box;}
-  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--slate-bg);color:#1E293B;}
-  header{background:var(--navy);padding:18px 20px;position:sticky;top:0;z-index:20;}
-  header .inner{max-width:900px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-  header .titlewrap{display:flex;align-items:center;gap:10px;}
-  header .bar{width:6px;height:26px;background:var(--teal);border-radius:4px;}
-  header h1{color:#fff;font-size:16px;margin:0;font-weight:700;letter-spacing:.2px;}
-  header p{color:#94A3B8;font-size:11px;margin:2px 0 0;}
-  .demo-pill{background:var(--amber);color:#fff;font-size:10.5px;font-weight:800;padding:5px 10px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase;}
-  .wrap{max-width:900px;margin:0 auto;padding:18px 16px 60px;}
-  .config{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;margin-bottom:16px;font-size:12px;}
-  .config label{display:block;font-weight:700;color:#64748B;text-transform:uppercase;font-size:10px;letter-spacing:.4px;margin-bottom:6px;}
-  .config input{width:100%;padding:9px 10px;border:1px solid var(--card-border);border-radius:8px;font-size:13px;}
-  .config .hint{color:#94A3B8;margin-top:6px;font-size:11px;}
-  .lines{display:flex;gap:8px;margin-bottom:12px;}
-  .line-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--card-border);background:#fff;font-weight:700;font-size:13px;cursor:pointer;color:#64748B;}
-  .line-btn.active{background:var(--navy);color:#fff;border-color:var(--navy);}
-  .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:18px;}
-  .cat-card{background:#fff;border:1.5px solid var(--card-border);border-radius:10px;padding:12px;cursor:pointer;text-align:left;font-size:12.5px;font-weight:700;color:var(--navy);transition:.12s;}
-  .cat-card:hover{border-color:var(--blue);}
-  .cat-card.active{border-color:var(--teal);background:#F0FDFA;}
-  .cat-card .unit{display:block;font-weight:500;color:#94A3B8;font-size:10.5px;margin-top:3px;text-transform:none;}
-  form{display:none;}
-  form.show{display:block;}
-  .section{background:#fff;border:1px solid var(--card-border);border-radius:12px;padding:16px;margin-bottom:14px;}
-  .section h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:#64748B;margin:0 0 12px;font-weight:700;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;}
-  .field label{display:block;font-size:12px;font-weight:600;color:#334155;margin-bottom:5px;}
-  .field label .req{color:var(--red);}
-  .field input,.field select{width:100%;padding:10px 11px;border:1px solid var(--card-border);border-radius:8px;font-size:13.5px;background:#fff;}
-  .field input:focus,.field select:focus{outline:2px solid var(--blue);outline-offset:0;border-color:var(--blue);}
-  .preview{display:flex;gap:18px;flex-wrap:wrap;background:var(--navy);border-radius:12px;padding:14px 18px;margin-bottom:14px;color:#fff;}
-  .preview .item .label{font-size:10px;text-transform:uppercase;color:#94A3B8;letter-spacing:.4px;}
-  .preview .item .val{font-size:17px;font-weight:700;margin-top:2px;}
-  .actions{display:flex;gap:10px;align-items:center;}
-  button.submit{background:var(--teal);color:#fff;border:none;padding:13px 26px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;}
-  button.submit:disabled{opacity:.6;cursor:not-allowed;}
-  button.reset{background:#fff;border:1px solid var(--card-border);padding:13px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;color:#64748B;}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;z-index:50;box-shadow:0 8px 24px rgba(0,0,0,.2);display:none;max-width:90vw;text-align:center;}
-  .toast.ok{background:var(--green);}
-  .toast.err{background:var(--red);}
-  .toast.info{background:var(--navy);}
-  .empty-state{text-align:center;color:#94A3B8;font-size:13px;padding:30px 0;}
-  .demo-log{background:#fff;border:1px dashed var(--card-border);border-radius:12px;padding:14px 16px;margin-top:18px;font-size:11.5px;}
-  .demo-log h4{margin:0 0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:#94A3B8;}
-  .demo-log .row{padding:8px 0;border-top:1px solid var(--card-border);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;}
-  .demo-log .row:first-child{border-top:none;}
-  .demo-log .row b{color:var(--navy);}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+  header{background:var(--brand);color:#fff;padding:10px 18px;display:flex;flex-wrap:wrap;gap:10px;align-items:center;position:sticky;top:0;z-index:20}
+  header h1{font-size:16px;margin:0;font-weight:650;flex:1;min-width:200px}
+  header .sub{font-size:12px;opacity:.8;font-weight:400;display:block}
+  .tabs{display:flex;gap:4px}
+  .tab{padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px;color:#d9eadf}
+  .tab.active{background:#fff;color:var(--brand)}
+  .btn{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-weight:600;white-space:nowrap}
+  .btn:hover{filter:brightness(.96)}
+  .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .btn.green{background:var(--brand2);border-color:var(--brand2);color:#fff}
+  .btn.ghost{background:transparent;color:#fff;border-color:rgba(255,255,255,.4)}
+  .btn.sm{padding:4px 8px;font-size:12px}
+  .btn.lg{padding:11px 22px;font-size:15px}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  main{padding:14px 18px 40px;max-width:1500px;margin:0 auto}
+  .hidden{display:none!important}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;min-width:0}
+  .card h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  input,select{width:100%;padding:7px 9px;border:1px solid #cdd5cb;border-radius:7px;font:inherit;font-size:14px;background:#fff;color:var(--ink)}
+  input:focus,select:focus{outline:2px solid #9cc9ae;border-color:var(--brand2)}
+  input[readonly]{background:#f6f7f4}
+  label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;font-weight:650;text-transform:uppercase;letter-spacing:.03em}
+  .muted{color:var(--muted)} .hint{font-size:12px;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:6px 7px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{background:#f1f3ef;font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:#4c574f;white-space:nowrap}
+  td.n,th.n{text-align:right;white-space:nowrap}
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+  /* entry layout */
+  .entry{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:14px;align-items:start}
+  @media(max-width:1100px){.entry{grid-template-columns:1fr}}
+  .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .span2{grid-column:span 2} @media(max-width:520px){.span2{grid-column:span 1}}
+  .badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em}
+  .b-WALKIN{background:#fff1d6;color:#8a5b00}.b-SALARYDEDUCT{background:#e3eefb;color:#1e4f8a}.b-VOLUMEBUYER{background:#e2f3e8;color:#1f6b43}
+  .catrow{display:flex;gap:8px;align-items:center;margin-top:5px;flex-wrap:wrap}
+  .catrow select{width:auto;padding:3px 6px;font-size:12px}
+  .lines input{padding:6px 7px}
+  .lines td{padding:4px 5px}
+  .lines .amt{font-weight:700;font-size:14px}
+  .unit{font-size:11px;color:var(--muted)}
+  .warn{font-size:11px;color:var(--accent)}
+  .totalbar{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:12px 14px;background:var(--soft);border-radius:10px}
+  .grand{font-size:26px;font-weight:800;color:var(--brand)}
+  .glabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .big{font-size:24px;font-weight:800}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+  .stat{background:var(--soft);border-radius:10px;padding:10px 12px}
+  .stat .v{font-size:20px;font-weight:800;margin-top:2px}
+  .stat.main{background:var(--brand);color:#fff}.stat.main .glabel{color:#cfe5d7}
+  .sub-tot td{font-weight:700;background:#fafbf8}
+  .bar{height:8px;background:var(--brand2);border-radius:4px;min-width:2px}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
+  .ltabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .ltab{padding:7px 12px;border-radius:8px;cursor:pointer;background:#e6ebe4;font-weight:600;font-size:13px}
+  .ltab.active{background:var(--brand);color:#fff}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+  .ledit td{padding:3px 4px}.ledit input,.ledit select{padding:5px 7px;font-size:13px}
+  .overlay{position:fixed;inset:0;background:rgba(20,30,24,.45);display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 10px}
+  .modal{background:#fff;border-radius:12px;width:min(820px,100%);box-shadow:0 20px 60px rgba(0,0,0,.25)}
+  .modal .mh{background:var(--brand);color:#fff;padding:10px 16px;border-radius:12px 12px 0 0;display:flex;align-items:center}
+  .modal .mh h3{margin:0;font-size:15px;flex:1}
+  .modal .body{padding:14px 16px}
+  .modal .foot{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end}
+  .toast{position:fixed;bottom:18px;right:18px;background:#1b2620;color:#fff;padding:10px 14px;border-radius:8px;z-index:99;font-size:13px;max-width:420px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  .toast.err{background:#a2321f}
+  .iconbtn{border:none;background:none;cursor:pointer;font-size:14px;padding:2px 4px;color:var(--muted)}
+  .iconbtn:hover{color:var(--ink)}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="inner">
-    <div class="titlewrap">
-      <div class="bar"></div>
-      <div>
-        <h1>MMFI Sales Entry</h1>
-        <p>Log a transaction — it writes straight to the Google Sheet</p>
-      </div>
-    </div>
-    <span class="demo-pill" id="modePill">Demo Mode</span>
+  <h1>Sales Meat &amp; Livestock — Sales Entry<span class="sub" id="status">Loading…</span></h1>
+  <div class="tabs">
+    <div class="tab active" data-tab="entry">Enter Sales</div>
+    <div class="tab" data-tab="summary">Summary</div>
+    <div class="tab" data-tab="lists">Rates &amp; Lists</div>
   </div>
+  <button class="btn ghost" id="btnRefresh" title="Reload from Google Sheet">⟳</button>
+  <a class="btn ghost hidden" id="lnkSheet" target="_blank" style="text-decoration:none">Sheet ↗</a>
 </header>
 
-<div class="wrap">
-
-  <div class="config">
-    <label>Apps Script Web App URL</label>
-    <input id="apiUrl" placeholder="Leave blank to keep exploring in demo mode, or paste your deployed URL" />
-    <div class="hint" id="hintText">No URL set — you're in <b>demo mode</b>: the form is fully live and clickable, but "Save" just logs the entry below instead of writing to a real Sheet. Paste your deployed Apps Script URL above (or hardcode it in CONFIG.WEB_APP_URL) to go live.</div>
+<main>
+  <div id="noGas" class="card hidden" style="background:#fff6e0;border-color:#f0d58a;margin-bottom:12px">
+    Open this dashboard through your Apps Script <b>web app link</b> (see the setup guide). It needs that link to read and save to your Google Sheet.
   </div>
 
-  <div class="lines" id="lineTabs"></div>
-  <div class="cat-grid" id="catGrid"></div>
+  <!-- ================= ENTER SALES ================= -->
+  <section id="tab-entry">
+    <div class="entry">
+      <div class="card">
+        <h2>New sale</h2>
+        <div class="fgrid">
+          <div><label>Date</label><input type="date" id="eDate"></div>
+          <div><label>Representative</label><select id="eRep"></select></div>
+          <div class="span2"><label>Customer</label>
+            <input id="eCust" list="dl-customers" placeholder="Type name — volume buyer / employee / walk-in" autocomplete="off">
+            <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span>
+              <span class="hint" id="eCatWhy">Not in Volume Buyers or Employees list</span>
+              <span style="flex:1"></span>
+              <select id="eCatOverride" title="Change category for this sale"><option value="">Auto</option></select></div>
+          </div>
+          <div><label>Mode of payment</label><input id="eMode" list="dl-mode"></div>
+          <div><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
+          <div><label>DR #</label><input id="eDr"></div>
+          <div><label>S.I #</label><input id="eSi"></div>
+          <div><label>SO #</label><input id="eSo"></div>
+          <div class="span2"><label>Remarks</label><input id="eRemarks"></div>
+        </div>
 
-  <div id="formHost"><div class="empty-state">Pick a product line and category above to start a transaction.</div></div>
+        <div style="margin-top:14px" class="tablewrap">
+          <table class="lines">
+            <thead><tr><th style="min-width:260px">Product</th><th style="width:70px">Heads</th><th style="width:100px" class="n">Weight (kg)</th><th style="width:120px" class="n">Rate</th><th style="width:130px" class="n">Amount</th><th style="width:30px"></th></tr></thead>
+            <tbody id="lineBody"></tbody>
+          </table>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button class="btn sm" id="addLine">+ Add product line</button>
+          <span class="hint">Enter = next field · Ctrl+Enter = save</span>
+        </div>
 
-  <div class="demo-log" id="demoLog" style="display:none;">
-    <h4>Demo submissions (not saved anywhere — for preview only)</h4>
-    <div id="demoLogRows"></div>
-  </div>
+        <div class="totalbar">
+          <div><div class="glabel">Lines</div><div class="big" id="tLines">0</div></div>
+          <div><div class="glabel">Total kg</div><div class="big" id="tKg">0</div></div>
+          <div><div class="glabel">Payment</div><div style="font-weight:700" id="tPaid">—</div></div>
+          <span style="flex:1"></span>
+          <div style="text-align:right"><div class="glabel">Total amount</div><div class="grand" id="tAmt">₱0.00</div></div>
+          <button class="btn" id="btnClear">Clear</button>
+          <button class="btn primary lg" id="btnSave">Save sale</button>
+        </div>
+      </div>
 
-</div>
+      <div class="card">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
+          <div style="flex:1"><h2 style="margin:0">Entries for</h2></div>
+          <div style="width:170px"><input type="date" id="dDate"></div>
+        </div>
+        <div class="stats" id="dayStats"></div>
+        <div class="tablewrap" style="max-height:62vh"><table id="dayTable"></table></div>
+      </div>
+    </div>
+  </section>
 
-<div class="toast" id="toast"></div>
+  <!-- ================= SUMMARY ================= -->
+  <section id="tab-summary" class="hidden">
+    <div class="card" style="margin-bottom:12px">
+      <div class="fgrid">
+        <div><label>From</label><input type="date" id="sFrom"></div>
+        <div><label>To</label><input type="date" id="sTo"></div>
+        <div><label>Representative</label><select id="sRep"></select></div>
+        <div><label>Customer category</label><select id="sCat"></select></div>
+        <div><label>Product category</label><select id="sProd"></select></div>
+        <div style="display:flex;align-items:flex-end;gap:6px">
+          <button class="btn sm" data-range="today">Today</button>
+          <button class="btn sm" data-range="month">This month</button>
+          <button class="btn sm" data-range="all">All</button>
+        </div>
+      </div>
+    </div>
+    <div class="stats" id="sumStats"></div>
+    <div class="sgrid" id="sumTables"></div>
+  </section>
+
+  <!-- ================= RATES & LISTS ================= -->
+  <section id="tab-lists" class="hidden">
+    <div class="card">
+      <div class="ltabs" id="ltabs"></div>
+      <div class="toolbar">
+        <input id="lSearch" placeholder="Search…" style="max-width:260px">
+        <button class="btn sm" id="lAdd">+ Add row</button>
+        <span id="lInfo" class="hint"></span>
+        <span style="flex:1"></span>
+        <button class="btn sm" id="lSeed" title="Adds names/products found in your sales sheet that are not yet in this list">Add missing from sales sheet</button>
+        <button class="btn green" id="lSave" disabled>Save list</button>
+      </div>
+      <div class="hint" id="lHelp" style="margin-bottom:8px"></div>
+      <div class="tablewrap" style="max-height:66vh"><table class="ledit" id="lTable"></table></div>
+    </div>
+  </section>
+</main>
+
+<div id="modalRoot"></div>
+<datalist id="dl-customers"></datalist><datalist id="dl-products"></datalist><datalist id="dl-mode"></datalist><datalist id="dl-prodCats"></datalist>
 
 <script>
-const CONFIG = {
-  // Hardcode your deployed Apps Script URL here so staff never have to paste it:
-  WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbxxC3PDw7iSYoCZ6H9fZROwr5PYUjKh0jI1JHgRTdYo4TVlcKHzD0gbdoFNJ3qVx7YkvQ/exec'
-};
+/* ================= settings ================= */
+let CAT = {walkin:'WALK-IN', employee:'SALARY DEDUCT', volume:'VOLUME BUYER'};   // replaced by server config
+let SOURCE = 'MCP';
+const CASH_MODE = 'CASH :  OFFICE CASHIER';      // default mode for walk-in
+const CREDIT_MODE = 'CREDIT';                    // default mode for employees / volume buyers
+const AUTO_REFRESH_MIN = 5;
 
-/* ===================================================================== *
- *  DEMO SCHEMA — mirrors Code.gs CATEGORIES exactly, so this file can be
- *  clicked through with zero backend. Once a real Web App URL is set,
- *  the app fetches the live schema/refs from Apps Script instead.
- * ===================================================================== */
-const CATEGORIES = {
-  MARKET_HOGS: { sheetName:'MARKET HOGS', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['MARKET HOGS','CULLED SOW','CULLED BOAR','CULLED GILTS','OTHER INCOME'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  CARCASS_MEAT: { sheetName:'CARCASS & MEAT PROD', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULARS', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['PORK','BEEF','CHICKEN'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULARS','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  FEEDS_PREMIXES: { sheetName:'FEEDS & PREMIXES', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'BAGS'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['BB FEEDS','BG FEEDS','PREMIXES'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','BAGS','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  OTHER_LIVE_ANIMALS: { sheetName:'OTHER LIVE ANIMALS', line:'Swine & Meat', unit:'kgs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS/ SET'},{header:'WEIGHT (KILOS)'}], amountQtyHeader:'WEIGHT (KILOS)', productCategoryOptions:['CATTLE','SHEEP','HORSE'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS/ SET','WEIGHT (KILOS)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  COFFEE: { sheetName:'COFFEE', line:'Swine & Meat', unit:'seedlings', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'SEEDLING (BAG/POT)'}], amountQtyHeader:'SEEDLING (BAG/POT)', productCategoryOptions:['ARABICA','LIBERICA','EXCELSA','ROBUSTA'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','SEEDLING (BAG/POT)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  TABLE_EGGS: { sheetName:'TABLE EGGS', line:'Poultry', unit:'pcs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (pcs.)'}], amountQtyHeader:'QTY (pcs.)', productCategoryOptions:['BB TABLE EGGS','TETRA TABLE EGGS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (pcs.)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  CULLED_CHICKEN: { sheetName:'CULLED CHICKEN', line:'Poultry', unit:'heads', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'HEADS'}], amountQtyHeader:'HEADS', productCategoryOptions:['CULLED CHICKEN','CHICKEN DUNG'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','HEADS','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  HATCHING_EGGS: { sheetName:'HATCHING EGGS', line:'Poultry', unit:'pcs', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'TOTAL QTY DELIVERED (pcs.)'},{header:'ALLOWANCE (1%-CE / 2%-ABBA) / FREE OF CHARGE'}], soldHeader:'TOTAL QTY SOLD(pcs.)', amountQtyHeader:'TOTAL QTY SOLD(pcs.)', hasCIStatus:true, noTag:true, productCategoryOptions:['HE-CLASS A','HE-CLASS B','DELIVERY FEE','PACKAGING MATERIALS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','HOUSE # (If applicable)','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','TOTAL QTY DELIVERED (pcs.)','ALLOWANCE (1%-CE / 2%-ABBA) / FREE OF CHARGE','TOTAL QTY SOLD(pcs.)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR #','INHOUSE DR#','C.I #','CI STATUS (SYSTEM UPLOAD)','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','REMARKS'] },
-  DAY_OLD_CHICKS: { sheetName:'DAY-OLD-CHICKS', line:'Poultry', unit:'chicks', dateHeader:'DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (chicks/pcs.)'},{header:'FREE OF CHARGE ALLOWANCE'}], soldHeader:'TOTAL QTY SOLD', amountQtyHeader:'TOTAL QTY SOLD', productCategoryOptions:['DAY-OLD-CHICKS','DOC BY PRODUCT','USED PACKAGING MATERIALS'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER CATEGORY','DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (chicks/pcs.)','FREE OF CHARGE ALLOWANCE','TOTAL QTY SOLD','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','LT#','DR #','INHOUSE DR#','C.I #','S.I #','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] },
-  BROILERTETRA: { sheetName:'BROILERTETRA', line:'Poultry', unit:'heads', dateHeader:'PICK-UP / DELIVERY DATE', particularsHeader:'PARTICULAR(S)', qty:[{header:'QTY (kgs.)'},{header:'QTY (heads)'}], amountQtyHeader:'QTY (heads)', productCategoryOptions:['BROILER CHICKEN','TETRA CHICKEN'], headers:['REPRESENTATIVE','SOURCE/ ORIGIN','CYCLE #','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','MONTH','CUSTOMER','PARTICULAR(S)','PRODUCT CATEGORY','QTY (kgs.)','QTY (heads)','RATE','AMOUNT','PAYMENT','WITHHOLD','WITHHELD AMOUNT','2307 FORM STATUS','BALANCE','MODE OF PAYMENT','TERMS (# OF DAYS)','REF: SO #','SO STATUS','DR#','INHOUSE DR#','C.I #','SI#','AR-SWI #','DUE DATE','DAYS OVERDUE','CR#','PAYMENT STATUS','CHEQUE #','CHEQUE DATE','TAG #','REMARKS'] }
-};
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const HAS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
+let ROWS = [], LISTS = {rates:[], reps:[], prodCats:[], volumeBuyers:[], employees:[]};
+let IDX = {vb:new Map(), emp:new Map(), rate:new Map()};
 
-const ENUM_OPTIONS = {
-  'CUSTOMER CATEGORY': ['WALK-IN','VOLUME BUYER','CONTRACT BUYER','SALARY DEDUCT','COMMUNITY'],
-  '2307 FORM STATUS': ['RECEIVED 2307','2307 FOR FOLLOW UP','NOT APPLICABLE'],
-  'MODE OF PAYMENT': ['CASH : OFFICE CASHIER','CASH : COD','CASH : ONLINE/BANK DEP','CREDIT'],
-  'SO STATUS': ['PENDING APPROVAL','SO APPROVED','PENDING FULFILMENT','FULFILLED','BILLED'],
-  'CI STATUS (SYSTEM UPLOAD)': ['PENDING UPLOAD','DONE UPLOAD'],
-  'WITHHOLD': ['No','Yes']
-};
-const BASE_COMPUTED = ['MONTH','PRODUCT CATEGORY','AMOUNT','WITHHELD AMOUNT','BALANCE','DUE DATE','DAYS OVERDUE','PAYMENT STATUS'];
-const REQUIRED_HEADERS = ['REPRESENTATIVE','CUSTOMER','PARTICULAR(S)','PARTICULARS','RATE','CUSTOMER CATEGORY'];
-
-function computedHeaderSet(cat){ const s={}; BASE_COMPUTED.forEach(h=>s[h]=true); if (cat.soldHeader) s[cat.soldHeader]=true; return s; }
-function fieldMeta(header, cat){
-  const h = header.trim();
-  if (ENUM_OPTIONS[h]) return { type:'select', options: ENUM_OPTIONS[h] };
-  if (h.indexOf('DATE')>=0) return { type:'date' };
-  if (h==='TERMS (# OF DAYS)' || h==='RATE' || h==='PAYMENT') return { type:'number' };
-  if (cat.qty.some(q=>q.header===h)) return { type:'number' };
-  if (['REPRESENTATIVE','SOURCE/ ORIGIN','CUSTOMER','PARTICULAR(S)','PARTICULARS'].indexOf(h)>=0) return { type:'text', suggest:true };
-  return { type:'text' };
+/* ================= utils ================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const key = s => String(s == null ? '' : s).toUpperCase().replace(/[^A-Z0-9]/g, '');
+const isBlank = v => v === null || v === undefined || String(v).trim() === '';
+function num(v){ if (typeof v === 'number') return v; if (isBlank(v)) return 0; const n = parseFloat(String(v).replace(/[₱,\s]/g,'')); return isNaN(n) ? 0 : n; }
+const r2 = n => Math.round((n + Number.EPSILON) * 100) / 100;
+const peso = n => '₱' + (n||0).toLocaleString('en-PH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const kgf = n => (n||0).toLocaleString('en-PH',{maximumFractionDigits:3});
+const pad = n => String(n).padStart(2,'0');
+const isoOf = d => d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const todayISO = () => isoOf(new Date());
+const MON3 = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function toISO(v){
+  if (isBlank(v)) return '';
+  const s = String(v).trim();
+  let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if (m) return m[1]+'-'+pad(m[2])+'-'+pad(m[3]);
+  m = s.match(/^(\d{1,2})[-\s\/]([A-Za-z]{3})[A-Za-z]*[-\s\/,]+(\d{2,4})$/);
+  if (m && MON3[m[2].toLowerCase()] !== undefined){ let y = +m[3]; if (y < 100) y += 2000; return y+'-'+pad(MON3[m[2].toLowerCase()]+1)+'-'+pad(m[1]); }
+  return '';
 }
-function buildLocalSchema(){
-  const out = {};
-  Object.keys(CATEGORIES).forEach(key=>{
-    const cat = CATEGORIES[key];
-    const computedSet = computedHeaderSet(cat);
-    const fields = cat.headers.map(h=>{
-      const computed = !!computedSet[h];
-      const meta = computed ? {type:'computed'} : fieldMeta(h, cat);
-      return Object.assign({header:h, computed, required: !computed && REQUIRED_HEADERS.indexOf(h)>=0}, meta);
-    });
-    out[key] = { key, sheetName:cat.sheetName, line:cat.line, unit:cat.unit, productCategoryOptions:cat.productCategoryOptions, fields };
-  });
-  return out;
+function addDays(iso, d){ const [y,m,dd] = iso.split('-').map(Number); return isoOf(new Date(y, m-1, dd + (d||0))); }
+function daysBetween(a, b){ const [y1,m1,d1]=a.split('-').map(Number), [y2,m2,d2]=b.split('-').map(Number); return Math.round((Date.UTC(y2,m2-1,d2)-Date.UTC(y1,m1-1,d1))/864e5); }
+function fmtDate(iso){ if (!iso) return ''; const [y,m,d] = iso.split('-'); return +d + ' ' + MONTHS[+m-1].slice(0,3) + ' ' + y; }
+function prodFrom(p){ const s = String(p||'').toUpperCase(); for (const c of ['PORK','BEEF','CHICKEN']) if (s.startsWith(c)) return c; return s.split(/[\s:]/)[0] || 'OTHER'; }
+const isCredit = m => /CREDIT/i.test(m || '');
+function toast(msg, err){ const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), err ? 7000 : 3000); }
+function store(k, v){ try { if (v === undefined) return localStorage.getItem('sml_'+k); localStorage.setItem('sml_'+k, v); } catch(e){ return null; } }
+function api(fn, ...args){ return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args)); }
+const catLabel = c => c === CAT.employee ? 'EMPLOYEE (' + c + ')' : c;
+function sumBy(rows, kf, vf){ const m = new Map(); rows.forEach(r => { const k = kf(r) || '(blank)'; m.set(k, (m.get(k)||0) + vf(r)); }); return m; }
+
+/* ================= lists / lookups ================= */
+function buildIndex(){
+  IDX.vb = new Map(LISTS.volumeBuyers.map(o => [key(o.name), o]));
+  IDX.emp = new Map(LISTS.employees.map(o => [key(o.name), o]));
+  IDX.rate = new Map(LISTS.rates.map(o => [key(o.particulars), o]));
+  // datalists
+  const custs = new Map();
+  LISTS.volumeBuyers.forEach(o => custs.set(key(o.name), [o.name, 'Volume buyer']));
+  LISTS.employees.forEach(o => { if (!custs.has(key(o.name))) custs.set(key(o.name), [o.name, 'Employee']); });
+  ROWS.forEach(r => { if (r.customer && !custs.has(key(r.customer))) custs.set(key(r.customer), [r.customer, 'Walk-in']); });
+  $('dl-customers').innerHTML = [...custs.values()].sort((a,b) => a[0].localeCompare(b[0])).map(c => '<option value="' + esc(c[0]) + '">' + c[1] + '</option>').join('');
+  $('dl-products').innerHTML = LISTS.rates.map(o => '<option value="' + esc(o.particulars) + '">' + esc(o.prodCat || '') + '</option>').join('');
+  $('dl-prodCats').innerHTML = LISTS.prodCats.map(o => '<option value="' + esc(o.name) + '">').join('');
+  const modes = new Set([CASH_MODE, CREDIT_MODE, 'CASH : ONLINE/BANK DEP']); ROWS.forEach(r => r.mode && modes.add(r.mode));
+  $('dl-mode').innerHTML = [...modes].map(m => '<option value="' + esc(m) + '">').join('');
+  // reps
+  const sel = $('eRep'), cur = sel.value || store('rep') || '';
+  sel.innerHTML = '<option value="">— select —</option>' + LISTS.reps.map(o => '<option>' + esc(o.name) + '</option>').join('');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  // category override
+  $('eCatOverride').innerHTML = '<option value="">Auto</option>' + [CAT.walkin, CAT.employee, CAT.volume].map(c => '<option value="' + esc(c) + '">' + esc(catLabel(c)) + '</option>').join('');
 }
-
-// Small realistic sample sets per category, just so the autosuggest fields feel alive in demo mode
-const DEMO_REFS = {
-  MARKET_HOGS: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['KINATE'], CUSTOMER:['EARLICK TABACO','KEAN PATRICK DAG-O'], PARTICULARS:['CULLED SOW','CULLED BOAR','CULLED GILTS'] },
-  CARCASS_MEAT: { REPRESENTATIVE:['JESON SOCONG'], SOURCE:['MCP'], CUSTOMER:['ORLAND CABANEROS EDUAVE'], PARTICULARS:['BEEF : WASTE BONES','PORK PRIME : CARCASS HEADLESS'] },
-  FEEDS_PREMIXES: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['DOUBLE HOPE'], CUSTOMER:['LAVCO'], PARTICULARS:['FEEDS : BROILER BREEDER STARTER MASH - COBB'] },
-  OTHER_LIVE_ANIMALS: { REPRESENTATIVE:['JUAN MIGUEL DECENA'], SOURCE:['KALILANGAN'], CUSTOMER:['RAMMEL DAGOPLO'], PARTICULARS:['SHEEP','CATTLE FATTENERS'] },
-  COFFEE: { REPRESENTATIVE:[], SOURCE:[], CUSTOMER:[], PARTICULARS:['A1 - SABIA TARDIO'] },
-  TABLE_EGGS: { REPRESENTATIVE:['HERLEEN JABINIAO'], SOURCE:['REY GO 1','PMM1'], CUSTOMER:['ROSITA ADLAWAN'], PARTICULARS:['BB : DEFORMED'] },
-  CULLED_CHICKEN: { REPRESENTATIVE:['CLYDESDALLE SUSUSCO'], SOURCE:['JIREH'], CUSTOMER:['JERALDINE LIU','JESSICA ALONZO'], PARTICULARS:['REGULAR CULLED CHICKEN'] },
-  HATCHING_EGGS: { REPRESENTATIVE:['GUEENGEL BAGONGON'], SOURCE:['PMM1'], CUSTOMER:['CEPI'], PARTICULARS:['HATCHING EGGS : CLASS A'] },
-  DAY_OLD_CHICKS: { REPRESENTATIVE:['JAZZTINEMUR GAID'], SOURCE:['CHICK HAVEN'], CUSTOMER:['DUQUE FARM CORP','AZRIEL VERANO'], PARTICULARS:['DOC CLASS A','DOC CLASS B'] },
-  BROILERTETRA: { REPRESENTATIVE:['BARBIE JOY PUYOS','SHEILA SORONIO'], SOURCE:['PMM3'], CUSTOMER:['JERICK LINDUNGAN','LEGASPI REYNALDO'], PARTICULARS:['LIVE TETRA GROW OUT'] }
-};
-
-let SCHEMA = null;
-let currentCat = null;
-let currentLine = 'Swine & Meat';
-let demoSubmissions = [];
-
-const $ = (id) => document.getElementById(id);
-function apiUrl(){ return (CONFIG.WEB_APP_URL || $('apiUrl').value || '').trim(); }
-function isDemo(){ return !apiUrl(); }
-
-function toast(msg, kind){
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + (kind || 'info');
-  t.style.display = 'block';
-  clearTimeout(t._timer);
-  t._timer = setTimeout(()=>{ t.style.display='none'; }, 3800);
+function detectCat(name){
+  const k = key(name);
+  if (k && IDX.vb.has(k)) return {cat: CAT.volume, why: 'Found in Volume Buyers list', vb: IDX.vb.get(k)};
+  if (k && IDX.emp.has(k)) return {cat: CAT.employee, why: 'Found in Employees list'};
+  return {cat: CAT.walkin, why: k ? 'Not in Volume Buyers or Employees list' : ''};
+}
+function rateFor(particulars, cat){
+  const r = IDX.rate.get(key(particulars));
+  if (!r) return null;
+  const col = cat === CAT.volume ? 'volume' : cat === CAT.employee ? 'employee' : 'walkin';
+  const rate = num(r[col]) || num(r.walkin) || num(r.employee) || num(r.volume);
+  return {rate, unit: /^H/i.test(r.unit || '') ? 'HEAD' : 'KG', prodCat: r.prodCat || prodFrom(particulars), fallback: !num(r[col])};
 }
 
-function updateModePill(){
-  $('modePill').style.display = isDemo() ? 'inline-block' : 'none';
-  $('hintText').innerHTML = isDemo()
-    ? 'No URL set — you\'re in <b>demo mode</b>: the form is fully live and clickable, but "Save" just logs the entry below instead of writing to a real Sheet. Paste your deployed Apps Script URL above (or hardcode it in CONFIG.WEB_APP_URL) to go live.'
-    : 'Connected — transactions will be written to your live Google Sheet.';
+/* ================= data load ================= */
+function enrich(o){
+  o._date = toISO(o.date);
+  o._kg = num(o.weight); o._rate = num(o.rate);
+  o._amt = isBlank(o.amount) ? r2(o._kg * o._rate) : num(o.amount);
+  o._pay = num(o.payment); o._wh = num(o.withheld);
+  o._bal = isBlank(o.balance) ? r2(o._amt - o._pay - o._wh) : num(o.balance);
+  o._prod = String(isBlank(o.prodCat) ? prodFrom(o.particulars) : o.prodCat).toUpperCase().trim();
+  ['rep','custCat','customer','particulars','mode'].forEach(k => o[k] = String(o[k] ?? '').trim());
+  return o;
+}
+async function load(silent){
+  if (!HAS_GAS){ $('noGas').classList.remove('hidden'); $('status').textContent = 'Not connected'; return; }
+  if (!silent) $('status').textContent = 'Loading…';
+  try {
+    const d = await api('getData');
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; }
+    ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); });
+    LISTS = d.lists;
+    $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden');
+    buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters(); renderSummary();
+    if (!LEDIT.dirty) openList(LEDIT.key || 'rates');
+    $('status').textContent = ROWS.length.toLocaleString() + ' sales lines · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+  } catch (e){ $('status').textContent = 'Error loading'; toast('Error: ' + (e.message || e), true); }
 }
 
-async function loadSchema(){
-  updateModePill();
-  if (isDemo()){
-    SCHEMA = buildLocalSchema();
-    renderLineTabs(); renderCatGrid();
-    return;
+/* ================= ENTRY FORM ================= */
+let currentCat = CAT.walkin, lastAutoCust = '';
+function lineHtml(){
+  return '<tr><td><input data-l="particulars" list="dl-products" placeholder="Product / particulars" autocomplete="off"><div class="unit" data-info></div></td>' +
+    '<td><input data-l="heads"></td>' +
+    '<td><input data-l="weight" type="number" step="any" min="0" style="text-align:right"></td>' +
+    '<td><input data-l="rate" type="number" step="any" min="0" style="text-align:right"><div class="unit" data-unit style="text-align:right"></div></td>' +
+    '<td class="n amt" data-amt>₱0.00</td>' +
+    '<td><button class="iconbtn" data-rm title="Remove line">✕</button></td></tr>';
+}
+function addLine(focus){ $('lineBody').insertAdjacentHTML('beforeend', lineHtml()); if (focus) $('lineBody').lastElementChild.querySelector('input').focus(); }
+function effectiveCat(){ return $('eCatOverride').value || currentCat; }
+
+function onCustomer(keepMode){
+  const det = detectCat($('eCust').value);
+  currentCat = det.cat;
+  const cat = effectiveCat();
+  $('eCatBadge').textContent = catLabel(cat);
+  $('eCatBadge').className = 'badge b-' + key(cat);
+  $('eCatWhy').textContent = $('eCatOverride').value ? 'Set manually' : det.why;
+  // default payment mode & terms for this category (only when customer changes)
+  const ck = key($('eCust').value) + '|' + cat;
+  if ((!keepMode || !$('eMode').value) && ck !== lastAutoCust){
+    lastAutoCust = ck;
+    if (cat === CAT.volume){ const vb = det.vb || {}; $('eMode').value = vb.mode || CREDIT_MODE; $('eTerms').value = isBlank(vb.terms) ? '' : vb.terms; }
+    else if (cat === CAT.employee){ $('eMode').value = CREDIT_MODE; $('eTerms').value = 0; }
+    else { $('eMode').value = CASH_MODE; $('eTerms').value = ''; }
   }
-  try{
-    const res = await fetch(apiUrl() + '?action=schema');
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'schema failed');
-    SCHEMA = data.categories;
-    renderLineTabs(); renderCatGrid();
-  }catch(err){
-    toast('Could not reach that URL, falling back to demo mode. ' + err.message, 'err');
-    SCHEMA = buildLocalSchema();
-    renderLineTabs(); renderCatGrid();
-  }
+  // re-apply rates that were not typed by hand
+  $('lineBody').querySelectorAll('tr').forEach(tr => applyRate(tr, false));
+  recalc();
 }
-
-function renderLineTabs(){
-  const lines = [...new Set(Object.values(SCHEMA).map(c=>c.line))];
-  $('lineTabs').innerHTML = lines.map(l =>
-    `<button class="line-btn ${l===currentLine?'active':''}" data-line="${l}">${l}</button>`
-  ).join('');
-  $('lineTabs').querySelectorAll('.line-btn').forEach(btn=>{
-    btn.onclick = () => { currentLine = btn.dataset.line; renderLineTabs(); renderCatGrid(); };
+function applyRate(tr, force){
+  const p = tr.querySelector('[data-l=particulars]').value.trim();
+  const rateEl = tr.querySelector('[data-l=rate]');
+  const info = tr.querySelector('[data-info]');
+  const rf = p ? rateFor(p, effectiveCat()) : null;
+  tr.dataset.unit = rf ? rf.unit : 'KG';
+  tr.dataset.prodCat = rf ? rf.prodCat : prodFrom(p);
+  if (rf && (force || !rateEl.dataset.manual)) { rateEl.value = rf.rate || ''; rateEl.dataset.manual = ''; }
+  info.innerHTML = !p ? '' : rf ? esc(tr.dataset.prodCat) + (rf.fallback ? ' · <span class="warn">no ' + esc(catLabel(effectiveCat()).toLowerCase()) + ' rate, using walk-in</span>' : '')
+    : '<span class="warn">Not in Rates list — type the rate</span>';
+}
+function lineValues(tr){
+  const g = k => tr.querySelector('[data-l=' + k + ']').value.trim();
+  const unit = tr.dataset.unit || 'KG';
+  const heads = g('heads'), weight = num(g('weight')), rate = num(g('rate'));
+  const amount = r2(unit === 'HEAD' ? num(heads) * rate : weight * rate);
+  return {particulars: g('particulars'), heads, weight, rate, unit, amount, prodCat: tr.dataset.prodCat || prodFrom(g('particulars'))};
+}
+function recalc(){
+  let n = 0, kg = 0, amt = 0;
+  $('lineBody').querySelectorAll('tr').forEach(tr => {
+    const v = lineValues(tr);
+    tr.querySelector('[data-amt]').textContent = peso(v.amount);
+    tr.querySelector('[data-unit]').textContent = v.particulars ? (v.unit === 'HEAD' ? 'per head' : 'per kg') : '';
+    if (v.particulars || v.amount){ n++; kg += v.weight; amt += v.amount; }
   });
+  $('tLines').textContent = n; $('tKg').textContent = kgf(kg); $('tAmt').textContent = peso(amt);
+  $('tPaid').textContent = isCredit($('eMode').value) ? 'Charged (unpaid)' : 'Paid in full';
 }
-
-function renderCatGrid(){
-  const cats = Object.entries(SCHEMA).filter(([k,c])=>c.line===currentLine);
-  $('catGrid').innerHTML = cats.map(([key,c]) =>
-    `<button class="cat-card ${key===currentCat?'active':''}" data-key="${key}">
-       ${titleCase(c.sheetName)}<span class="unit">unit: ${c.unit}</span>
-     </button>`
-  ).join('');
-  $('catGrid').querySelectorAll('.cat-card').forEach(btn=>{
-    btn.onclick = () => selectCategory(btn.dataset.key);
+function buildRows(){
+  const date = $('eDate').value, cat = effectiveCat(), mode = $('eMode').value.trim(), terms = $('eTerms').value.trim();
+  const today = todayISO(), credit = isCredit(mode);
+  const due = credit ? addDays(date, num(terms)) : '';
+  const lines = [...$('lineBody').querySelectorAll('tr')].map(lineValues).filter(v => v.particulars || v.weight || v.amount);
+  const errs = [];
+  if (!date) errs.push('date'); if (!$('eRep').value) errs.push('representative'); if (!$('eCust').value.trim()) errs.push('customer');
+  if (!lines.length) errs.push('at least one product line');
+  lines.forEach((v, i) => { if (!v.particulars || !v.amount || !v.weight) errs.push('line ' + (i+1) + ' (product, weight and rate)'); });
+  if (errs.length) return {errs};
+  const rows = lines.map(v => {
+    const pay = credit ? 0 : v.amount, bal = r2(v.amount - pay);
+    return {rep: $('eRep').value, source: SOURCE, custCat: cat, date, month: MONTHS[+date.slice(5,7) - 1], customer: $('eCust').value.trim(),
+      particulars: v.particulars, prodCat: v.prodCat, heads: v.heads, weight: v.weight,
+      rate: v.unit === 'HEAD' ? r2(v.amount / v.weight) : v.rate, amount: v.amount, payment: pay || '',
+      withhold: false, balance: bal, mode, terms, so: $('eSo').value.trim(), dr: $('eDr').value.trim(), si: $('eSi').value.trim(),
+      due, daysOverdue: bal > 0 && due ? Math.max(0, daysBetween(due, today)) : '-',
+      payStatus: bal <= 0.005 ? 'PAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks: $('eRemarks').value.trim()};
   });
+  return {rows};
+}
+function clearForm(){
+  ['eCust','eDr','eSi','eSo','eRemarks'].forEach(id => $(id).value = '');
+  $('eCatOverride').value = ''; lastAutoCust = '';
+  $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
+  $('eCust').focus();
+}
+async function saveSale(){
+  const b = buildRows();
+  if (b.errs) return toast('Please fill: ' + b.errs.join(', '), true);
+  const btn = $('btnSave'); btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    await api('addRows', b.rows);
+    store('rep', $('eRep').value);
+    const total = b.rows.reduce((a, r) => a + r.amount, 0);
+    toast('Saved ' + b.rows.length + ' line(s) · ' + peso(total) + ' ✓');
+    $('dDate').value = $('eDate').value;
+    clearForm(); await load(true);
+  } catch (e){ toast('Save failed: ' + (e.message || e), true); }
+  btn.disabled = false; btn.textContent = 'Save sale';
 }
 
-function titleCase(s){
-  return s.split(' ').map(w => w.length<=3 && w===w.toUpperCase() ? w : (w.charAt(0)+w.slice(1).toLowerCase())).join(' ');
+/* ================= DAY PANEL ================= */
+function renderDay(){
+  const d = $('dDate').value;
+  const rows = ROWS.filter(r => r._date === d).sort((a, b) => a._row - b._row);
+  const tot = rows.reduce((a, r) => a + r._amt, 0), kg = rows.reduce((a, r) => a + r._kg, 0);
+  const byCat = sumBy(rows, r => r.custCat, r => r._amt);
+  $('dayStats').innerHTML = '<div class="stat main"><div class="glabel">Total amount</div><div class="v">' + peso(tot) + '</div></div>' +
+    '<div class="stat"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
+    [...byCat.entries()].map(([c, v]) => '<div class="stat"><div class="glabel">' + esc(c) + '</div><div class="v" style="font-size:16px">' + peso(v) + '</div></div>').join('');
+  if (!rows.length){ $('dayTable').innerHTML = '<tr><td class="muted" style="padding:20px;text-align:center">No entries on ' + fmtDate(d) + '.</td></tr>'; return; }
+  // group by customer (in entry order)
+  const groups = new Map();
+  rows.forEach(r => { const k = r.customer + '|' + r.custCat; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  let h = '<thead><tr><th>Product</th><th class="n">Kg</th><th class="n">Rate</th><th class="n">Amount</th><th></th></tr></thead><tbody>';
+  groups.forEach(list => {
+    const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0);
+    h += '<tr class="sub-tot"><td colspan="3">' + esc(r0.customer) + ' <span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span> <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td><td></td></tr>';
+    h += list.map(r => '<tr><td>' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
+      '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
+  });
+  h += '<tr class="sub-tot"><td>TOTAL (' + rows.length + ' lines)</td><td class="n">' + kgf(kg) + '</td><td></td><td class="n">' + peso(tot) + '</td><td></td></tr></tbody>';
+  $('dayTable').innerHTML = h;
 }
 
-const SECTIONS = {
-  transaction: { title: 'Transaction Details', keys: ['REPRESENTATIVE','SOURCE/ ORIGIN','HOUSE # (If applicable)','CYCLE #','CUSTOMER CATEGORY','PICK-UP / DELIVERY DATE','DATE','CUSTOMER','PARTICULAR(S)','PARTICULARS'] },
-  volume: { title: 'Volume & Pricing', keys: [] },
-  payment: { title: 'Payment & Tax', keys: ['PAYMENT','WITHHOLD','2307 FORM STATUS','MODE OF PAYMENT','TERMS (# OF DAYS)'] },
-  refs: { title: 'References & Aging', keys: ['REF: SO #','SO STATUS','LT#','DR #','INHOUSE DR#','C.I #','CI STATUS (SYSTEM UPLOAD)','S.I #','AR-SWI #','CR#','CHEQUE #','CHEQUE DATE','TAG #'] },
-  notes: { title: 'Remarks', keys: ['REMARKS'] }
+/* ================= EDIT / DELETE ================= */
+function openEdit(r){
+  const F = [['date','Date','date',r._date],['rep','Representative','rep',r.rep],['customer','Customer','text',r.customer],['custCat','Customer category','cat',r.custCat],
+    ['particulars','Product','prod',r.particulars],['heads','Heads','text',r.heads],['weight','Weight (kg)','number',r._kg],['rate','Rate (per kg)','number',r._rate],
+    ['amount','Amount','number',r._amt],['mode','Mode of payment','mode',r.mode],['terms','Terms','number',r.terms],['dr','DR #','text',r.dr],['si','S.I #','text',r.si],['so','SO #','text',r.so],['remarks','Remarks','text',r.remarks]];
+  const inp = ([k, l, t, v]) => {
+    let el;
+    if (t === 'rep') el = '<select data-f="rep">' + LISTS.reps.map(o => '<option' + (o.name === v ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('') + (LISTS.reps.some(o => o.name === v) ? '' : '<option selected>' + esc(v) + '</option>') + '</select>';
+    else if (t === 'cat') el = '<select data-f="custCat">' + [...new Set([CAT.walkin, CAT.employee, CAT.volume, v].filter(Boolean))].map(c => '<option' + (c === v ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select>';
+    else el = '<input data-f="' + k + '" type="' + (t === 'date' || t === 'number' ? t : 'text') + '"' + (t === 'number' ? ' step="any"' : '') + (t === 'prod' ? ' list="dl-products"' : t === 'mode' ? ' list="dl-mode"' : '') + ' value="' + esc(v ?? '') + '">';
+    return '<div' + (['customer','particulars','remarks'].includes(k) ? ' class="span2"' : '') + '><label>' + l + '</label>' + el + '</div>';
+  };
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>Edit sale line · sheet row ' + r._row + '</h3><button class="btn ghost sm" data-x>✕</button></div>' +
+    '<div class="body"><div class="fgrid">' + F.map(inp).join('') + '</div><p class="hint">Changing weight or rate recalculates the amount and balance.</p></div>' +
+    '<div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="saveEdit">Save changes</button></div></div></div>';
+  $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
+  $('saveEdit').onclick = async () => {
+    const f = {}; $('modalRoot').querySelectorAll('[data-f]').forEach(el => f[el.dataset.f] = el.value.trim());
+    const ch = {};
+    F.forEach(([k,,, v]) => { if (String(f[k]) !== String(v ?? '')) ch[k] = f[k]; });
+    if (('weight' in ch || 'rate' in ch) && !('amount' in ch)) ch.amount = f.amount = r2(num(f.weight) * num(f.rate));
+    if ('date' in ch) ch.month = MONTHS[+f.date.slice(5,7) - 1];
+    if ('particulars' in ch) { const rf = rateFor(f.particulars, f.custCat); ch.prodCat = rf ? rf.prodCat : prodFrom(f.particulars); }
+    if ('amount' in ch || 'mode' in ch) {
+      const paid = !isCredit(f.mode), amt = num(f.amount), pay = paid ? amt : r._pay, bal = r2(amt - pay - r._wh);
+      ch.payment = pay || ''; ch.balance = bal;
+      ch.payStatus = bal <= 0.005 ? 'PAID' : (r.due && toISO(r.due) < todayISO() ? 'OVERDUE' : 'NOT YET DUE');
+    }
+    if (!Object.keys(ch).length) { $('modalRoot').innerHTML = ''; return; }
+    try { await api('updateRows', [{row: r._row, check: {customer: r.customer, particulars: r.particulars}, changes: ch}]); $('modalRoot').innerHTML = ''; toast('Updated ✓'); load(true); }
+    catch (e){ toast('Update failed: ' + (e.message || e), true); }
+  };
+}
+async function delRow(r){
+  if (!confirm('Delete this line from the Google Sheet?\n\n' + r.customer + '\n' + r.particulars + ' · ' + kgf(r._kg) + ' kg · ' + peso(r._amt))) return;
+  try { await api('deleteRow', r._row, {customer: r.customer, particulars: r.particulars}); toast('Deleted'); load(true); }
+  catch (e){ toast('Delete failed: ' + (e.message || e), true); }
+}
+
+/* ================= SUMMARY ================= */
+function setOpts(sel, vals){ const cur = sel.value; sel.innerHTML = '<option value="">All</option>' + vals.map(v => '<option>' + esc(v) + '</option>').join(''); if (vals.includes(cur)) sel.value = cur; }
+function fillSummaryFilters(){
+  const u = k => [...new Set(ROWS.map(r => r[k]).filter(Boolean))].sort();
+  setOpts($('sRep'), u('rep')); setOpts($('sCat'), u('custCat')); setOpts($('sProd'), u('_prod'));
+}
+function renderSummary(){
+  const f = {from:$('sFrom').value, to:$('sTo').value, rep:$('sRep').value, cat:$('sCat').value, prod:$('sProd').value};
+  const v = ROWS.filter(r => (!f.from || r._date >= f.from) && (!f.to || r._date <= f.to) && (!f.rep || r.rep === f.rep) && (!f.cat || r.custCat === f.cat) && (!f.prod || r._prod === f.prod));
+  const tot = v.reduce((a, r) => a + r._amt, 0), kg = v.reduce((a, r) => a + r._kg, 0);
+  const paid = v.reduce((a, r) => a + r._pay, 0), bal = v.reduce((a, r) => a + Math.max(0, r._bal), 0);
+  $('sumStats').innerHTML =
+    '<div class="stat main"><div class="glabel">Total amount</div><div class="v">' + peso(tot) + '</div></div>' +
+    '<div class="stat"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
+    '<div class="stat"><div class="glabel">Paid</div><div class="v">' + peso(paid) + '</div></div>' +
+    '<div class="stat"><div class="glabel">Unpaid balance</div><div class="v">' + peso(bal) + '</div></div>' +
+    '<div class="stat"><div class="glabel">Lines / customers</div><div class="v">' + v.length + ' / ' + new Set(v.map(r => r.customer)).size + '</div></div>';
+  const table = (title, kf, limit, sortByKey) => {
+    const m = new Map();
+    v.forEach(r => { const k = kf(r) || '(blank)'; const e = m.get(k) || {amt:0, kg:0}; e.amt += r._amt; e.kg += r._kg; m.set(k, e); });
+    let rows = [...m.entries()];
+    rows = sortByKey ? rows.sort((a, b) => b[0].localeCompare(a[0])) : rows.sort((a, b) => b[1].amt - a[1].amt);
+    if (limit) rows = rows.slice(0, limit);
+    const max = Math.max(1, ...rows.map(e => e[1].amt));
+    return '<div class="card"><h2>' + title + '</h2><div class="tablewrap" style="max-height:420px"><table><thead><tr><th></th><th class="n">Kg</th><th class="n">Amount</th><th style="width:22%"></th></tr></thead><tbody>' +
+      rows.map(([k, e]) => '<tr><td>' + esc(sortByKey ? fmtDate(k) : k) + '</td><td class="n">' + kgf(e.kg) + '</td><td class="n">' + peso(e.amt) + '</td><td><div class="bar" style="width:' + (e.amt / max * 100).toFixed(1) + '%"></div></td></tr>').join('') +
+      '<tr class="sub-tot"><td>Total</td><td class="n">' + kgf(rows.reduce((a, e) => a + e[1].kg, 0)) + '</td><td class="n">' + peso(rows.reduce((a, e) => a + e[1].amt, 0)) + '</td><td></td></tr></tbody></table></div></div>';
+  };
+  $('sumTables').innerHTML = table('By product category', r => r._prod) + table('By customer category', r => r.custCat) +
+    table('By representative', r => r.rep) + table('Daily totals', r => r._date, 0, true) +
+    table('Top 15 products', r => r.particulars, 15) + table('Top 15 customers', r => r.customer, 15);
+}
+function setRange(which){
+  const t = todayISO();
+  if (which === 'today'){ $('sFrom').value = t; $('sTo').value = t; }
+  else if (which === 'month'){ $('sFrom').value = t.slice(0,8) + '01'; $('sTo').value = t; }
+  else { $('sFrom').value = ''; $('sTo').value = ''; }
+  renderSummary();
+}
+
+/* ================= RATES & LISTS EDITOR ================= */
+const LIST_UI = {
+  rates: {title:'Rates', help:'Rates used as the basis when entering sales. Unit KG = amount is weight × rate. Unit HEAD = amount is heads × rate (e.g. dressed chicken sold per piece). Blank employee / volume buyer rate falls back to the walk-in rate.',
+    cols:[{k:'particulars',l:'Particulars (product)',w:'34%'},{k:'prodCat',l:'Product category',list:'dl-prodCats'},{k:'unit',l:'Unit',opts:['KG','HEAD'],w:'90px'},{k:'walkin',l:'Walk-in rate',num:1},{k:'employee',l:'Employee rate',num:1},{k:'volume',l:'Volume buyer rate',num:1}]},
+  reps: {title:'Representatives', help:'Names shown in the Representative dropdown.', cols:[{k:'name',l:'Representative'}]},
+  prodCats: {title:'Product Categories', help:'Categories used for products in the Rates list (e.g. PORK, BEEF, CHICKEN).', cols:[{k:'name',l:'Product category'}]},
+  volumeBuyers: {title:'Volume Buyers', help:'Customers here are tagged VOLUME BUYER automatically, with their usual mode of payment and terms.',
+    cols:[{k:'name',l:'Customer name',w:'50%'},{k:'mode',l:'Mode of payment',list:'dl-mode'},{k:'terms',l:'Terms (days)',num:1}]},
+  employees: {title:'Employees', help:'Employees are tagged as salary deduction automatically. Anyone not in Volume Buyers or Employees is a WALK-IN.',
+    cols:[{k:'name',l:'Employee name',w:'60%'},{k:'dept',l:'Department'}]}
 };
-function sectionFor(header){
-  for (const key of ['transaction','payment','refs','notes']){
-    if (SECTIONS[key].keys.includes(header)) return key;
-  }
-  return 'volume';
+let LEDIT = {key:'rates', rows:[], dirty:false};
+function renderLtabs(){
+  $('ltabs').innerHTML = Object.keys(LIST_UI).map(k => '<div class="ltab' + (k === LEDIT.key ? ' active' : '') + '" data-l="' + k + '">' + LIST_UI[k].title + ' <span class="hint" style="color:inherit;opacity:.7">(' + (LISTS[k] || []).length + ')</span></div>').join('');
+}
+function openList(k){
+  if (LEDIT.dirty && k !== LEDIT.key && !confirm('You have unsaved changes in ' + LIST_UI[LEDIT.key].title + '. Discard them?')) return;
+  LEDIT = {key:k, rows:(LISTS[k] || []).map(o => Object.assign({}, o)), dirty:false};
+  $('lSearch').value = ''; renderLtabs(); renderList();
+}
+function setDirty(d){ LEDIT.dirty = d; $('lSave').disabled = !d; $('lSave').textContent = d ? 'Save list *' : 'Save list'; }
+function renderList(){
+  const ui = LIST_UI[LEDIT.key], q = $('lSearch').value.trim().toLowerCase();
+  $('lHelp').textContent = ui.help;
+  const shown = LEDIT.rows.map((o, i) => [o, i]).filter(([o]) => !q || ui.cols.some(c => String(o[c.k] ?? '').toLowerCase().includes(q)));
+  $('lInfo').textContent = shown.length + ' of ' + LEDIT.rows.length;
+  $('lTable').innerHTML = '<thead><tr>' + ui.cols.map(c => '<th' + (c.w ? ' style="width:' + c.w + '"' : '') + (c.num ? ' class="n"' : '') + '>' + c.l + '</th>').join('') + '<th style="width:30px"></th></tr></thead><tbody>' +
+    shown.map(([o, i]) => '<tr>' + ui.cols.map(c => '<td>' + (c.opts
+      ? '<select data-i="' + i + '" data-k="' + c.k + '">' + c.opts.map(x => '<option' + (String(o[c.k] || c.opts[0]).toUpperCase() === x ? ' selected' : '') + '>' + x + '</option>').join('') + '</select>'
+      : '<input data-i="' + i + '" data-k="' + c.k + '"' + (c.num ? ' type="number" step="any" style="text-align:right"' : '') + (c.list ? ' list="' + c.list + '"' : '') + ' value="' + esc(o[c.k] ?? '') + '">') + '</td>').join('') +
+      '<td><button class="iconbtn" data-rmi="' + i + '" title="Remove">✕</button></td></tr>').join('') + '</tbody>';
+  setDirty(LEDIT.dirty);
+}
+async function saveList(){
+  const k = LEDIT.key, first = LIST_UI[k].cols[0].k;
+  const seen = new Set(), dup = [];
+  LEDIT.rows.forEach(o => { const kk = key(o[first]); if (!kk) return; if (seen.has(kk)) dup.push(o[first]); seen.add(kk); });
+  if (dup.length) return toast('Duplicate entries: ' + dup.slice(0, 5).join(', '), true);
+  $('lSave').disabled = true; $('lSave').textContent = 'Saving…';
+  try {
+    LISTS[k] = await api('saveList', k, LEDIT.rows);
+    LEDIT.dirty = false; openList(k); buildIndex(); onCustomer(true);
+    toast(LIST_UI[k].title + ' saved ✓');
+  } catch (e){ toast('Save failed: ' + (e.message || e), true); setDirty(true); }
+}
+async function seedList(){
+  if (LEDIT.dirty) return toast('Save or discard your changes first.', true);
+  const k = LEDIT.key;
+  $('lSeed').disabled = true;
+  try {
+    const res = await api('seedLists', [k]);
+    LISTS = res.lists; LEDIT.dirty = false; openList(k); buildIndex();
+    toast(res.added[k] ? 'Added ' + res.added[k] + ' new entries from the sales sheet' : 'Nothing new to add — the list is up to date');
+  } catch (e){ toast('Failed: ' + (e.message || e), true); }
+  $('lSeed').disabled = false;
 }
 
-async function selectCategory(key){
-  currentCat = key;
-  renderCatGrid();
-  const cat = SCHEMA[key];
-
-  let refs = { REPRESENTATIVE:[], SOURCE:[], CUSTOMER:[], PARTICULARS:[] };
-  if (isDemo()){
-    refs = DEMO_REFS[key] || refs;
-  } else {
-    try{
-      const res = await fetch(apiUrl() + '?action=refs&cat=' + key);
-      const data = await res.json();
-      if (data.ok) refs = data.refs;
-    }catch(e){}
-  }
-
-  const buckets = { transaction:[], volume:[], payment:[], refs:[], notes:[] };
-  cat.fields.filter(f=>!f.computed).forEach(f => buckets[sectionFor(f.header)].push(f));
-
-  const datalistFor = { 'REPRESENTATIVE':refs.REPRESENTATIVE, 'SOURCE/ ORIGIN':refs.SOURCE, 'CUSTOMER':refs.CUSTOMER, 'PARTICULAR(S)':refs.PARTICULARS, 'PARTICULARS':refs.PARTICULARS };
-
-  let datalistsHtml = '';
-  let html = `<form id="entryForm" class="show" novalidate>`;
-  html += `<div class="preview"><div class="item"><div class="label">Est. Amount</div><div class="val" id="pvAmount">₱0</div></div><div class="item"><div class="label">Est. Balance</div><div class="val" id="pvBalance">₱0</div></div></div>`;
-
-  ['transaction','volume','payment','refs','notes'].forEach(secKey=>{
-    const fields = buckets[secKey];
-    if (!fields.length) return;
-    html += `<div class="section"><h3>${SECTIONS[secKey].title}</h3><div class="grid">`;
-    fields.forEach(f=>{
-      const fid = 'f_' + f.header.replace(/[^a-zA-Z0-9]/g,'_');
-      html += `<div class="field"><label>${escapeHtml(f.header)}${f.required?' <span class="req">*</span>':''}</label>`;
-      if (f.type === 'select'){
-        html += `<select id="${fid}" data-h="${escapeHtml(f.header)}">${f.options.map(o=>`<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join('')}</select>`;
-      } else if (f.type === 'date'){
-        html += `<input type="date" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
-      } else if (f.type === 'number'){
-        html += `<input type="number" step="any" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
-      } else if (f.suggest && datalistFor[f.header]){
-        const dlid = fid + '_dl';
-        html += `<input list="${dlid}" id="${fid}" data-h="${escapeHtml(f.header)}" autocomplete="off" />`;
-        datalistsHtml += `<datalist id="${dlid}">${(datalistFor[f.header]||[]).map(v=>`<option value="${escapeHtml(v)}">`).join('')}</datalist>`;
-      } else {
-        html += `<input type="text" id="${fid}" data-h="${escapeHtml(f.header)}" />`;
-      }
-      html += `</div>`;
-    });
-    html += `</div></div>`;
-  });
-
-  html += `<div class="field" style="margin-bottom:14px;"><label>PRODUCT CATEGORY <span style="font-weight:400;color:#94A3B8;">(auto-detected from Particulars — not a form field)</span></label><input value="e.g. ${cat.productCategoryOptions.slice(0,3).join(' / ')}…" disabled /></div>`;
-  html += `<div class="actions"><button type="submit" class="submit">Save Transaction</button><button type="button" class="reset" id="resetBtn">Clear Form</button></div>`;
-  html += `</form>` + datalistsHtml;
-
-  $('formHost').innerHTML = html;
-  $('entryForm').addEventListener('submit', submitForm);
-  $('resetBtn').addEventListener('click', ()=> selectCategory(key));
-  $('entryForm').querySelectorAll('input,select').forEach(el => el.addEventListener('input', updatePreview));
-
-  const dateHeader = cat.fields.find(f=>f.type==='date' && (f.header==='DATE'||f.header==='PICK-UP / DELIVERY DATE'))?.header;
-  const dateField = dateHeader ? document.querySelector(`[data-h="${dateHeader}"]`) : null;
-  if (dateField) dateField.value = new Date().toISOString().slice(0,10);
-}
-
-function updatePreview(){
-  const rate = Number(document.querySelector('[data-h="RATE"]')?.value || 0);
-  const payment = Number(document.querySelector('[data-h="PAYMENT"]')?.value || 0);
-  const qtyEls = [...document.querySelectorAll('input[type=number]')].filter(el => !['RATE','PAYMENT','TERMS (# OF DAYS)'].includes(el.dataset.h));
-  const qty = qtyEls.length ? Number(qtyEls[qtyEls.length-1].value || 0) : 0;
-  const amount = Math.round(qty * rate * 100) / 100;
-  const balance = Math.round((amount - payment) * 100) / 100;
-  $('pvAmount').textContent = peso(amount);
-  $('pvBalance').textContent = peso(balance);
-}
-
-function peso(n){ return '₱' + (Number(n)||0).toLocaleString('en-PH',{maximumFractionDigits:2}); }
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-async function submitForm(e){
+/* ================= events ================= */
+document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === t));
+  ['entry','summary','lists'].forEach(n => $('tab-' + n).classList.toggle('hidden', n !== t.dataset.tab));
+});
+$('btnRefresh').onclick = () => load();
+$('eCust').addEventListener('input', () => onCustomer());
+$('eCust').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); onCustomer(); $('lineBody').querySelector('input').focus(); } });
+$('eCatOverride').addEventListener('change', () => { lastAutoCust = ''; onCustomer(); });
+$('eMode').addEventListener('input', recalc);
+$('eDate').addEventListener('change', () => { $('dDate').value = $('eDate').value; renderDay(); });
+$('eRep').addEventListener('change', () => store('rep', $('eRep').value));
+$('addLine').onclick = () => addLine(true);
+$('btnClear').onclick = clearForm;
+$('btnSave').onclick = saveSale;
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey && !$('tab-entry').classList.contains('hidden') && !$('modalRoot').innerHTML){ e.preventDefault(); saveSale(); } });
+const lb = $('lineBody');
+lb.addEventListener('input', e => {
+  const tr = e.target.closest('tr'), k = e.target.dataset.l;
+  if (k === 'rate') e.target.dataset.manual = e.target.value ? '1' : '';
+  if (k === 'particulars') applyRate(tr, true);
+  recalc();
+});
+lb.addEventListener('click', e => { if (e.target.closest('[data-rm]')){ const tr = e.target.closest('tr'); if (lb.rows.length > 1) tr.remove(); else tr.querySelectorAll('input').forEach(i => { i.value = ''; i.dataset.manual = ''; }); applyRate(lb.rows[0], true); recalc(); } });
+lb.addEventListener('keydown', e => {
+  if (e.key !== 'Enter' || e.ctrlKey) return;
   e.preventDefault();
-  const values = {};
-  document.querySelectorAll('#entryForm [data-h]').forEach(el=>{ values[el.dataset.h] = el.value; });
-  const btn = document.querySelector('#entryForm .submit');
-  btn.disabled = true; btn.textContent = 'Saving…';
+  const tr = e.target.closest('tr'), ins = [...tr.querySelectorAll('input')], i = ins.indexOf(e.target);
+  if (i < ins.length - 1) ins[i+1].focus();
+  else if (tr === lb.lastElementChild) addLine(true);
+  else tr.nextElementSibling.querySelector('input').focus();
+});
+$('dDate').addEventListener('change', renderDay);
+$('dayTable').addEventListener('click', e => {
+  const b = e.target.closest('[data-edit],[data-del]'); if (!b) return;
+  const r = ROWS.find(x => x._row === +(b.dataset.edit || b.dataset.del)); if (!r) return;
+  if (b.dataset.edit) openEdit(r); else delRow(r);
+});
+['sFrom','sTo','sRep','sCat','sProd'].forEach(id => $(id).addEventListener('change', renderSummary));
+document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => setRange(b.dataset.range));
+$('ltabs').addEventListener('click', e => { const t = e.target.closest('[data-l]'); if (t) openList(t.dataset.l); });
+$('lSearch').addEventListener('input', renderList);
+$('lAdd').onclick = () => { const o = {}; LIST_UI[LEDIT.key].cols.forEach(c => o[c.k] = c.opts ? c.opts[0] : ''); LEDIT.rows.unshift(o); $('lSearch').value = ''; setDirty(true); renderList(); $('lTable').querySelector('tbody input').focus(); };
+$('lTable').addEventListener('input', e => { const el = e.target; if (el.dataset.i === undefined) return; LEDIT.rows[+el.dataset.i][el.dataset.k] = el.value; setDirty(true); });
+$('lTable').addEventListener('change', e => { const el = e.target; if (el.tagName === 'SELECT'){ LEDIT.rows[+el.dataset.i][el.dataset.k] = el.value; setDirty(true); } });
+$('lTable').addEventListener('click', e => { const b = e.target.closest('[data-rmi]'); if (b){ LEDIT.rows.splice(+b.dataset.rmi, 1); setDirty(true); renderList(); } });
+$('lSave').onclick = saveList;
+$('lSeed').onclick = seedList;
+window.addEventListener('beforeunload', e => { if (LEDIT.dirty){ e.preventDefault(); e.returnValue = ''; } });
 
-  if (isDemo()){
-    await new Promise(r=>setTimeout(r, 400));
-    demoSubmissions.unshift({ category: SCHEMA[currentCat].sheetName, values, amount: $('pvAmount').textContent, balance: $('pvBalance').textContent, time: new Date().toLocaleTimeString() });
-    renderDemoLog();
-    toast('Demo save ✓ — logged below (not written to a real Sheet)', 'ok');
-    btn.disabled = false; btn.textContent = 'Save Transaction';
-    selectCategory(currentCat);
-    return;
-  }
-
-  try{
-    const res = await fetch(apiUrl(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ category: currentCat, values })
-    });
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || 'Save failed');
-    toast('Saved to ' + SCHEMA[currentCat].sheetName + ' ✓', 'ok');
-    selectCategory(currentCat);
-  }catch(err){
-    toast('Error: ' + err.message, 'err');
-  }finally{
-    btn.disabled = false; btn.textContent = 'Save Transaction';
-  }
-}
-
-function renderDemoLog(){
-  $('demoLog').style.display = demoSubmissions.length ? 'block' : 'none';
-  $('demoLogRows').innerHTML = demoSubmissions.slice(0,8).map(s => `
-    <div class="row">
-      <span><b>${s.category}</b> — ${escapeHtml(s.values['CUSTOMER'] || s.values['PARTICULAR(S)'] || s.values['PARTICULARS'] || '—')}</span>
-      <span>Amount ${s.amount} · Balance ${s.balance} · ${s.time}</span>
-    </div>`).join('');
-}
-
-$('apiUrl').value = CONFIG.WEB_APP_URL;
-$('apiUrl').addEventListener('change', loadSchema);
-loadSchema();
+/* ================= start ================= */
+$('eDate').value = todayISO(); $('dDate').value = todayISO();
+$('sFrom').value = todayISO().slice(0,8) + '01'; $('sTo').value = todayISO();
+addLine(); addLine();
+renderLtabs();
+if (AUTO_REFRESH_MIN) setInterval(() => { if (!$('modalRoot').innerHTML && !LEDIT.dirty && !document.activeElement.closest('#tab-entry')) load(true); }, AUTO_REFRESH_MIN * 60000);
+load();
 </script>
 </body>
 </html>
