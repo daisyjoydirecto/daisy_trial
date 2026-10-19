@@ -266,7 +266,7 @@
             <span class="hint">Company:</span><select id="upComp" style="width:auto"></select>
             <input type="file" id="upFile" accept=".xlsx,.xls,.csv" style="width:auto">
           </div>
-          <div class="hint" style="margin-top:6px">Uploading replaces that company's list for all users. It is not saved to the Google Sheet.</div>
+          <div class="hint" style="margin-top:6px">Uploading replaces that company's list for all users. Saved in the hidden Employees tab of the Google Sheet.</div>
         </div>
         <div class="toolbar"><input id="eSearch" placeholder="Search employee…" style="max-width:260px"><span id="eInfo" class="hint"></span><span style="flex:1"></span><button class="btn sm" id="eClearComp">Remove this company's list</button></div>
         <div class="tablewrap" style="max-height:56vh"><table id="empTable"></table></div>
@@ -349,9 +349,9 @@ async function api(fn, ...args){
 }
 function showConnect(msg){ const c = conn(); $('cUrl').value = c.url; $('cKey').value = c.key; $('cErr').textContent = msg || ''; $('connectBox').classList.remove('hidden'); }
 
-/* ================= shared lists (kept by the server in a private Drive file — not in the sheet) ================= */
+/* ================= shared lists (kept in hidden tabs of the Google Sheet) ================= */
 function emptyLists(){ const e = {}; COMPANIES.forEach(c => e[c] = []); return {v:0, rates:[], reps:[], prodCats:[], volumeBuyers:[], employees:e, empUpdated:{}}; }
-let LISTS_V = -1;
+let LISTS_V = '';
 function applyLists(l){ if (!l) return; const base = emptyLists(); Object.assign(base, l); COMPANIES.forEach(c => base.employees[c] = (l.employees || {})[c] || []); LISTS = base; LISTS_V = l.v; }
 function loadLocal(){  // older versions kept lists in the browser — used once to move them to the shared file
   try { const s = localStorage.getItem('sml_lists_v2'); if (!s) return null; const o = JSON.parse(s); const base = emptyLists(); Object.assign(base, o); COMPANIES.forEach(c => base.employees[c] = (o.employees || {})[c] || []); return base; }
@@ -470,7 +470,7 @@ let initDone = false;
 async function initLists(legacy){
   if (initDone) return; initDone = true;
   let src = loadLocal(), msg = 'Moved your lists from this browser to the shared lists — every user now sees the same rates & lists.';
-  if (!src && legacy){ src = Object.assign(emptyLists(), legacy); msg = 'Imported rates & lists from the old sheet tabs. You can now delete those tabs from the Google Sheet.'; }
+  if (!src && legacy){ src = Object.assign(emptyLists(), legacy); msg = 'Imported rates & lists.'; }
   if (!src){
     try { const seed = await api('getSeed'); src = emptyLists(); ['rates','reps','prodCats','volumeBuyers'].forEach(k => src[k] = seed[k] || []); msg = 'Rates & lists were pre-filled from your sales history. Please review them.'; }
     catch(e){ toast('Could not pre-fill lists: ' + (e.message || e), true); return; }
@@ -816,7 +816,7 @@ function openList(k){
 function setDirty(d){ LEDIT.dirty = d; $('lSave').disabled = !d; $('lSave').textContent = d ? 'Save list *' : 'Save list'; }
 function renderList(){
   const ui = LIST_UI[LEDIT.key], q = $('lSearch').value.trim().toLowerCase();
-  $('lHelp').textContent = ui.help + ' Shared by all dashboard users — not stored in the Google Sheet.';
+  $('lHelp').textContent = ui.help + ' Shared by all dashboard users — saved in a hidden tab of the Google Sheet.';
   const shown = LEDIT.rows.map((o, i) => [o, i]).filter(([o]) => !q || ui.cols.some(c => String(o[c.k] ?? '').toLowerCase().includes(q)));
   $('lInfo').textContent = shown.length + ' of ' + LEDIT.rows.length;
   $('lTable').innerHTML = '<thead><tr>' + ui.cols.map(c => '<th' + (c.w ? ' style="width:' + c.w + '"' : '') + (c.num ? ' class="n"' : '') + '>' + c.l + '</th>').join('') + '<th style="width:30px"></th></tr></thead><tbody>' +
@@ -914,7 +914,7 @@ function openSettings(){
       '<div class="span2"><label>Logo (PNG/JPG)</label><input type="file" id="stLogo" accept="image/*"></div>' +
       '<div style="display:flex;align-items:center;gap:8px"><img src="' + esc(s.logo || DEFAULT_LOGO) + '" style="height:40px"><button class="btn sm" id="stLogoReset">Default logo</button></div></div>' +
     '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Rates &amp; lists backup</h2>' +
-    '<p class="hint" style="margin-top:0">Lists are shared by all users (kept in a private file in your Google Drive, not in the sheet). A backup file is a handy extra copy.</p>' +
+    '<p class="hint" style="margin-top:0">Lists are shared by all users and kept in hidden tabs of your Google Sheet. A backup file is a handy extra copy.</p>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="stBackup">⬇ Download backup</button><label class="btn sm" style="margin:0;text-transform:none;font-size:12px;color:var(--ink)">⬆ Restore from backup<input type="file" id="stRestore" accept=".json" class="hidden"></label></div>' +
     '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="stSave">Save settings</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
