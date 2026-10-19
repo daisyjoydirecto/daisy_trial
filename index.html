@@ -15,27 +15,29 @@
     --brand:var(--olive); --brand2:var(--olive); --accent:var(--olive); --slip:#7cb342;
     --font:"Century Gothic",CenturyGothic,AppleGothic,"URW Gothic","URW Gothic L","Questrial",sans-serif;
     --serif:var(--font); --mono:var(--font);
+    --fs:0.5;   /* text size: 0.5 = 50% (A− / A / A+ buttons in the header change it) */
   }
   *{box-sizing:border-box}
-  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:14px;font-variant-numeric:tabular-nums}
+  body{margin:0;font-family:var(--font);background:var(--bg);color:var(--ink);font-size:max(11.2px, calc(14px * var(--fs)));font-variant-numeric:tabular-nums}
   /* ---------- header ---------- */
   header.top{background:var(--black);color:#fff;border-bottom:4px solid var(--lime);position:sticky;top:0;z-index:20}
-  header.top .wrap{max-width:1500px;margin:0 auto;padding:14px 22px 14px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
+  header.top .wrap{max-width:1440px;margin:0 auto;padding:calc(10px * var(--fs) + 4px) 12px;display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end}
   header.top .titles{flex:1;min-width:240px}
-  header.top .kicker{font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--lime)}
-  header.top h1{font-size:26px;margin:4px 0 2px;font-weight:700;letter-spacing:.005em}
-  header.top .sub{font-size:13px;color:#a8a8a8}
+  header.top .kicker{font-size:max(10px, calc(11px * var(--fs)));letter-spacing:.2em;text-transform:uppercase;color:var(--lime)}
+  header.top h1{font-size:max(20.8px, calc(26px * var(--fs)));margin:4px 0 2px;font-weight:700;letter-spacing:.005em}
+  header.top .sub{font-size:max(10.4px, calc(13px * var(--fs)));color:#a8a8a8}
   .hbtns{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .fsz{display:inline-flex}.fsz .btn{border-radius:0;margin-left:-1px;padding:.45em .7em}.fsz .btn:first-child{border-radius:3px 0 0 3px}.fsz .btn:last-child{border-radius:0 3px 3px 0}
   .tabs{display:flex;gap:6px;flex-wrap:wrap}
-  .tab{padding:7px 14px;border:1px solid #3a3a3a;border-radius:3px;cursor:pointer;font-size:13.5px;color:#ddd}
+  .tab{padding:.5em 1em;border:1px solid #3a3a3a;border-radius:3px;cursor:pointer;font-size:max(10.8px, calc(13.5px * var(--fs)));color:#ddd}
   .tab:hover{border-color:var(--lime);color:#fff}
   .tab.active{background:var(--lime);border-color:var(--lime);color:var(--black);font-weight:700}
-  .net{font-size:12px;padding:5px 10px;border-radius:3px;white-space:nowrap;border:1px solid #3a3a3a}
+  .net{font-size:max(10px, calc(12px * var(--fs)));padding:5px 10px;border-radius:3px;white-space:nowrap;border:1px solid #3a3a3a}
   .net.on{color:var(--lime)}.net.off{background:var(--amber);border-color:var(--amber);color:#1a1a1a;font-weight:700}
   #btnRefresh.pending{background:var(--amber);color:#1a1a1a;border-color:var(--amber)}
-  .pend{font-size:11px;font-weight:700;color:#7a4b00;background:#fdf0d9;border:1px solid #f3cf93;border-radius:3px;padding:1px 6px}
+  .pend{font-size:max(10px, calc(11px * var(--fs)));font-weight:700;color:#7a4b00;background:#fdf0d9;border:1px solid #f3cf93;border-radius:3px;padding:1px 6px}
   /* ---------- buttons ---------- */
-  .btn{font-family:var(--serif);border:1px solid var(--line2);background:#fff;color:var(--ink);border-radius:3px;padding:8px 14px;font-size:13.5px;cursor:pointer;font-weight:700;white-space:nowrap}
+  .btn{font-family:var(--serif);border:1px solid var(--line2);background:#fff;color:var(--ink);border-radius:3px;padding:.6em 1.05em;font-size:max(10.8px, calc(13.5px * var(--fs)));cursor:pointer;font-weight:700;white-space:nowrap}
   .btn:hover{border-color:var(--olive);color:var(--olive)}
   .btn.primary,.btn.green{background:var(--olive);border-color:var(--olive);color:#fff}
   .btn.primary:hover,.btn.green:hover{background:#4c6a00;color:#fff}
@@ -43,96 +45,104 @@
   .btn.ghost:hover{border-color:var(--lime);color:var(--lime)}
   .btn.outline{background:#fff;border-color:var(--lime);color:var(--olive)}
   .btn.outline:hover{background:var(--soft)}
-  .btn.sm{padding:5px 10px;font-size:12.5px}
-  .btn.lg{padding:12px 26px;font-size:16px;letter-spacing:.02em}
+  .btn.sm{padding:.4em .8em;font-size:max(10px, calc(12.5px * var(--fs)))}
+  .btn.lg{padding:.75em 1.6em;font-size:max(12.8px, calc(16px * var(--fs)));letter-spacing:.02em}
   .btn:disabled{opacity:.45;cursor:not-allowed}
-  .btn.print{background:var(--soft);border:1px solid var(--lime);color:var(--olive);padding:5px 11px;font-size:12.5px}
+  .btn.print{background:var(--soft);border:1px solid var(--lime);color:var(--olive);padding:.4em .9em;font-size:max(10px, calc(12.5px * var(--fs)))}
   .btn.print:hover{background:var(--lime);color:var(--black)}
-  main{padding:20px 22px 48px;max-width:1500px;margin:0 auto}
+  main{padding:14px 18px 24px;max-width:1440px;margin:0 auto}
   .hidden{display:none!important}
   /* ---------- cards & fields ---------- */
-  .card{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:18px 20px;min-width:0}
-  .card h2{margin:0 0 12px;font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted);font-weight:400}
-  .card h2.title{font-size:20px;letter-spacing:0;text-transform:none;color:var(--ink);font-weight:700;margin-bottom:14px}
-  input,select{width:100%;padding:9px 10px;border:1px solid var(--line2);border-radius:3px;font-family:var(--serif);font-size:14.5px;background:#fff;color:var(--ink)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:3px;padding:calc(12px * var(--fs) + 5px) calc(14px * var(--fs) + 6px);min-width:0}
+  .card h2{margin:0 0 8px;font-size:max(10px, calc(11.5px * var(--fs)));letter-spacing:.2em;text-transform:uppercase;color:var(--ink);font-weight:700}
+  .card h2.title{font-size:max(16px, calc(20px * var(--fs)));letter-spacing:0;text-transform:none;color:var(--ink);font-weight:700;margin-bottom:14px}
+  input,select{width:100%;padding:.6em .7em;border:1px solid var(--line2);border-radius:3px;font-family:var(--serif);font-size:max(11.6px, calc(14.5px * var(--fs)));background:#fff;color:var(--ink)}
   input:focus,select:focus{outline:none;border-color:var(--olive);box-shadow:0 0 0 3px rgba(141,182,0,.25)}
   select:disabled{background:#f7f7f7;color:#555}
-  label{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.14em}
+  label{font-size:max(10px, calc(11px * var(--fs)));color:var(--ink);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.12em;font-weight:700}
   .req{color:var(--red)}
-  .muted{color:var(--muted)} .hint{font-size:12.5px;color:var(--muted)}
-  table{width:100%;border-collapse:collapse;font-size:13.5px}
-  th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
-  th{background:#f7f7f7;font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);font-weight:400;white-space:nowrap}
+  .muted{color:var(--muted)} .hint{font-size:max(10px, calc(12.5px * var(--fs)));color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:max(10.8px, calc(13.5px * var(--fs)))}
+  th,td{padding:calc(7px * var(--fs) + 2px) calc(8px * var(--fs) + 2px);border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+  th{background:#f7f7f7;font-size:max(10px, calc(10.5px * var(--fs)));text-transform:uppercase;letter-spacing:.12em;color:var(--ink);font-weight:700;white-space:nowrap}
   td.n,th.n{text-align:right;white-space:nowrap}
   td.n{font-family:var(--mono)}
   .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:3px;background:#fff}
-  .entry{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:18px;align-items:start}
+  .entry{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:10px;align-items:start}
   @media(max-width:1100px){.entry{grid-template-columns:1fr}}
   .fgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-  .frow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:14px}
+  .frow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:calc(10px * var(--fs) + 4px);margin-bottom:calc(10px * var(--fs) + 4px)}
+  .frow.six{display:flex;flex-wrap:wrap}
+  .frow.six>div{flex:1 1 0;min-width:110px}
+  .frow.six>.s2{flex:2 1 0;min-width:200px}
   .frow .s2{grid-column:span 2}.frow .s4{grid-column:1/-1}
   @media(max-width:760px){.frow{grid-template-columns:1fr 1fr}.frow .s2{grid-column:1/-1}}
   .span2{grid-column:span 2} @media(max-width:520px){.span2{grid-column:span 1}}
   .docpair{display:flex;gap:6px}.docpair select{width:84px;flex:none}
-  .verifybar{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center;background:#fafcf3;border:1px dashed var(--lime);border-radius:3px;padding:12px 14px;margin:-2px 0 14px}
-  .verifybar .vf{min-width:150px;flex:0 0 180px}
-  .verifybar .vf.idf{flex:0 0 160px}
-  .badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:11px;font-weight:700;letter-spacing:.06em;border:1px solid transparent}
-  .switch{display:flex!important;align-items:center;gap:10px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:14px!important;color:var(--ink)!important;user-select:none;margin:0!important;flex:1;min-width:240px}
+  .verifybar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:#fafcf3;border:1px dashed var(--lime);border-radius:3px;padding:calc(12px * var(--fs) + 3px) calc(14px * var(--fs) + 4px);margin:-2px 0 calc(14px * var(--fs) + 4px);font-size:max(11.2px, calc(14px * var(--fs)))}
+  .verifybar .vf{min-width:110px;flex:0 0 calc(180px * var(--fs) + 60px)}
+  .verifybar .vf.idf{flex:0 0 calc(160px * var(--fs) + 50px)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:3px;font-size:max(10px, calc(11px * var(--fs)));font-weight:700;letter-spacing:.06em;border:1px solid transparent}
+  .switch{display:flex!important;align-items:center;gap:10px;cursor:pointer;text-transform:none!important;letter-spacing:0!important;font-size:max(11.2px, calc(14px * var(--fs)))!important;color:var(--ink)!important;user-select:none;margin:0!important;flex:1;min-width:240px}
   .switch.hidden{display:none!important}
   .switch input{display:none}
-  .switch .slider{position:relative;width:44px;height:24px;border-radius:24px;background:#c9c9c9;flex:none;transition:background .15s}
-  .switch .slider::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .15s}
+  .switch .slider{position:relative;width:3.1em;height:1.7em;border-radius:1.7em;background:#c9c9c9;flex:none;transition:background .15s}
+  .switch .slider::after{content:"";position:absolute;top:.2em;left:.2em;width:1.3em;height:1.3em;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transition:left .15s}
   .switch input:checked + .slider{background:var(--olive)}
-  .switch input:checked + .slider::after{left:23px}
-  .switch b{display:block;font-size:14px}.switch small{display:block;color:var(--muted);font-size:12px;margin-top:1px}
+  .switch input:checked + .slider::after{left:1.6em}
+  .switch b{display:block;font-size:max(11.2px, calc(14px * var(--fs)))}.switch small{display:block;color:var(--muted);font-size:max(10px, calc(12px * var(--fs)));margin-top:1px}
   .b-WALKIN{background:#fdf0d9;color:#7a4b00;border-color:#f3cf93}.b-OK{background:var(--soft);color:var(--olive);border-color:var(--lime)}.b-NO{background:#fdecea;color:var(--red);border-color:#f5b5ae}
   .b-EMP{background:#eaf1fb;color:var(--blue);border-color:#b9cfee}.b-VOLUMEBUYER{background:var(--soft);color:var(--olive);border-color:#cfe39a}
   .catrow{display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap}
-  .lines input{padding:7px 8px}
+  .lines input{padding:.45em .55em}
   .lines td{padding:5px 6px}
-  .lines .amt{font-weight:700;font-size:15px;font-family:var(--mono)}
-  .unit{font-size:11.5px;color:var(--muted);margin-top:2px}
-  .warn{font-size:11.5px;color:var(--red)}
-  .totalbar{display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-top:16px;padding:14px 18px;background:#fafafa;border:1px solid var(--line);border-top:3px solid var(--lime);border-radius:3px}
-  .grand{font-size:30px;font-weight:700;color:var(--ink);font-family:var(--mono)}
-  .glabel{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.16em}
-  .big{font-size:24px;font-weight:700;font-family:var(--mono)}
-  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:14px}
-  .stat{background:#fff;border:1px solid var(--line);border-top:3px solid #d9d9d9;border-radius:3px;padding:12px 14px}
-  .stat .v{font-size:21px;font-weight:700;margin-top:6px;font-family:var(--mono)}
+  .lines .amt{font-weight:700;font-size:max(12px, calc(15px * var(--fs)));font-family:var(--mono)}
+  .unit{font-size:max(10px, calc(11.5px * var(--fs)));color:var(--muted);margin-top:2px}
+  .warn{font-size:max(10px, calc(11.5px * var(--fs)));color:var(--red)}
+  .totalbar{display:flex;gap:calc(22px * var(--fs) + 6px);align-items:center;flex-wrap:wrap;margin-top:calc(10px * var(--fs) + 4px);padding:calc(14px * var(--fs) + 4px) calc(18px * var(--fs) + 4px);background:#fafafa;border:1px solid var(--line);border-top:3px solid var(--lime);border-radius:3px}
+  .grand{font-size:max(24px, calc(30px * var(--fs)));font-weight:700;color:var(--ink);font-family:var(--mono)}
+  .glabel{font-size:max(10px, calc(10.5px * var(--fs)));color:var(--ink);text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+  .big{font-size:max(19.2px, calc(24px * var(--fs)));font-weight:700;font-family:var(--mono)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:10px}
+  .stat{background:#fff;border:1px solid var(--line);border-top:3px solid #d9d9d9;border-radius:3px;padding:calc(12px * var(--fs) + 4px) calc(14px * var(--fs) + 4px)}
+  .stat .v{font-size:max(16.8px, calc(21px * var(--fs)));font-weight:700;margin-top:6px;font-family:var(--mono)}
   .stat.main{border-top-color:var(--lime)}.stat.dark{border-top-color:var(--black)}
   .stat.main .glabel{color:var(--muted)}
   .sub-tot td{font-weight:700;background:#fafafa}
   .grp td{background:#fbfcf6;border-top:1px solid #dfe8c3}
-  .ctrl{font-family:var(--mono);font-size:13px;color:var(--olive);font-weight:700}
+  .daypanel{position:sticky;top:calc(var(--hdr,70px) + 10px);display:flex;flex-direction:column;max-height:calc(100vh - var(--hdr,70px) - 20px)}
+  .daypanel .tablewrap{flex:1;min-height:120px;max-height:none!important}
+  @media(max-width:1100px){.daypanel{position:static;max-height:none}}
+  tr.clk{cursor:pointer}tr.clk:hover td{background:#f1f7dc}
+  .caret{display:inline-block;width:1.1em;color:var(--olive);font-weight:700}
+  .ctrl{font-family:var(--mono);font-size:max(10.4px, calc(13px * var(--fs)));color:var(--olive);font-weight:700}
   .bar{height:8px;background:var(--lime);border-radius:2px;min-width:2px}
-  .daily{font-size:13px;border-collapse:collapse;min-width:980px}
+  .daily{font-size:max(10.4px, calc(13px * var(--fs)));border-collapse:collapse;min-width:980px}
   .daily th,.daily td{border:1px solid #dcdcdc;padding:6px 9px;white-space:nowrap}
-  .daily thead th{color:#fff;text-transform:none;letter-spacing:.02em;font-size:13px;text-align:center;font-weight:700}
+  .daily thead th{color:#fff;text-transform:none;letter-spacing:.02em;font-size:max(10.4px, calc(13px * var(--fs)));text-align:center;font-weight:700}
   .daily .hAll{background:#1a1a1a}.daily .hCash{background:var(--olive)}.daily .hCred{background:#b45309}
   .daily td{text-align:right;font-family:var(--mono)}.daily td.l{text-align:left;font-family:var(--serif)}
   .daily tr.tot td{background:var(--soft);font-weight:700}
   .daily tr.avg td{background:#f2f2f2;font-weight:700}
   .daily tr.shr td{background:#fafafa;font-weight:700}
   .daily tr.today td{color:var(--olive);font-weight:700}
-  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px}
+  .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px}
   .ltabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  .ltab{padding:7px 13px;border:1px solid var(--lime);border-radius:3px;cursor:pointer;background:#fff;color:var(--olive);font-size:13.5px}
+  .ltab{padding:.5em .95em;border:1px solid var(--lime);border-radius:3px;cursor:pointer;background:#fff;color:var(--olive);font-size:max(10.8px, calc(13.5px * var(--fs)))}
   .ltab.active{background:var(--olive);border-color:var(--olive);color:#fff;font-weight:700}
-  .ltab.sm{padding:5px 10px;font-size:12.5px}
+  .ltab.sm{padding:5px 10px;font-size:max(10px, calc(12.5px * var(--fs)))}
   .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
-  .ledit td{padding:3px 4px}.ledit input,.ledit select{padding:6px 8px;font-size:13.5px}
+  .ledit td{padding:3px 4px}.ledit input,.ledit select{padding:.4em .55em;font-size:max(10.8px, calc(13.5px * var(--fs)))}
   .overlay{position:fixed;inset:0;background:rgba(13,13,13,.55);display:flex;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 10px}
   .modal{background:#fff;border-radius:3px;width:min(820px,100%);box-shadow:0 20px 60px rgba(0,0,0,.35)}
   .modal.wide{width:min(900px,100%)}
   .modal .mh{background:var(--black);color:#fff;padding:12px 16px;border-bottom:3px solid var(--lime);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .modal .mh h3{margin:0;font-size:17px;flex:1}
+  .modal .mh h3{margin:0;font-size:max(13.6px, calc(17px * var(--fs)));flex:1}
   .modal .body{padding:16px 18px}
   .modal .foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-  .toast{position:fixed;bottom:18px;right:18px;background:var(--black);color:#fff;border-left:4px solid var(--lime);padding:11px 15px;border-radius:3px;z-index:99;font-size:13.5px;max-width:440px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
+  .toast{position:fixed;bottom:18px;right:18px;background:var(--black);color:#fff;border-left:4px solid var(--lime);padding:11px 15px;border-radius:3px;z-index:99;font-size:max(10.8px, calc(13.5px * var(--fs)));max-width:440px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
   .toast.err{border-left-color:#ff6b5b;background:#2a0f0c}
-  .iconbtn{border:none;background:none;cursor:pointer;font-size:15px;padding:2px 5px;color:var(--muted2)}
+  .iconbtn{border:none;background:none;cursor:pointer;font-size:max(12px, calc(15px * var(--fs)));padding:2px 5px;color:var(--muted2)}
   .iconbtn:hover{color:var(--ink)}
   .drop{border:1px dashed var(--line2);border-radius:3px;padding:16px;text-align:center;background:#fafafa}
   .banner{border:1px solid #f5b5ae;background:#fdecea;color:#8a1c12;padding:10px 12px;border-radius:3px;font-weight:700}
@@ -204,6 +214,7 @@
       <div class="tab" data-tab="summary">Summary</div>
       <div class="tab" data-tab="lists">Rates &amp; Lists</div>
     </div>
+    <span class="fsz" title="Text size"><button class="btn ghost" data-fs="-1">A−</button><button class="btn ghost" data-fs="0" id="fsLabel">50%</button><button class="btn ghost" data-fs="1">A+</button></span>
     <span class="net on" id="netPill">● Online</span>
     <button class="btn ghost" id="btnRefresh" title="Upload sales saved offline and reload from the Google Sheet">⟳ Sync</button>
     <button class="btn ghost" id="btnSettings" title="Settings">⚙</button>
@@ -218,10 +229,10 @@
     <div class="fgrid">
       <div class="span2"><label>Web app URL</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
       <div><label>Access key</label><input id="cKey" type="password" autocomplete="new-password" spellcheck="false">
-        <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:12px;margin-top:4px"><input type="checkbox" id="cShow" style="width:auto"> show key</label></div>
+        <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:max(10px, calc(12px * var(--fs)));margin-top:4px"><input type="checkbox" id="cShow" style="width:auto"> show key</label></div>
       <div style="display:flex;align-items:flex-end"><button class="btn green" id="cGo" style="width:100%">Connect</button></div>
     </div>
-    <div class="warn" id="cErr" style="margin-top:8px;font-size:13px"></div>
+    <div class="warn" id="cErr" style="margin-top:8px;font-size:max(10.4px, calc(13px * var(--fs)))"></div>
   </div>
 
   <!-- ================= ENTER SALES ================= -->
@@ -246,13 +257,13 @@
           <div class="vf idf" id="eEmpNoBox"><label>ID # (for ATD) <span class="req">*</span></label><input id="eEmpNo" placeholder="Employee ID"></div>
         </div>
 
-        <div class="frow">
+        <div class="frow six">
           <div class="s2"><label>Customer <span class="req">*</span></label>
             <input id="eCust" list="dl-customers" placeholder="Type or pick a name" autocomplete="off">
             <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span><span class="hint" id="eCatWhy"></span></div></div>
           <div><label>Mode of payment</label><select id="eMode"></select></div>
           <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
-          <div class="s4"><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div>
+          <div class="s2 s2r"><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div>
         </div>
 
         <div style="margin-top:14px" class="tablewrap">
@@ -265,7 +276,7 @@
           <button class="btn sm outline" id="addLine">+ Add product line</button>
           <span class="hint">Enter = next field · Ctrl+Enter = save</span>
           <span style="flex:1"></span>
-          <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink);margin:0"><input type="checkbox" id="ePrintAfter" style="width:auto"> Show print slip after saving</label>
+          <label style="display:flex;gap:6px;align-items:center;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)));color:var(--ink);margin:0"><input type="checkbox" id="ePrintAfter" style="width:auto"> Show print slip after saving</label>
         </div>
 
         <div class="totalbar">
@@ -279,12 +290,13 @@
         </div>
       </div>
 
-      <div class="card">
-        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:10px">
+      <div class="card daypanel">
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:6px">
           <div style="flex:1;align-self:center"><h2 style="margin:0">Entries for</h2></div>
           <div style="width:170px"><input type="date" id="dDate"></div>
         </div>
-        <div class="stats" id="dayStats"></div>
+        <div class="toolbar" style="margin:0 0 8px"><span class="hint" id="dayInfo"></span><span style="flex:1"></span>
+          <button class="btn sm" id="dayExpand">Expand all</button><button class="btn sm" id="dayCollapse">Collapse all</button></div>
         <div class="tablewrap" style="max-height:62vh"><table id="dayTable"></table></div>
       </div>
     </div>
@@ -306,7 +318,7 @@
         </div>
       </div>
     </div>
-    <div class="stats" id="sumStats"></div>
+
     <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
       <div style="display:flex;align-items:center;padding:10px 14px"><h2 style="margin:0;flex:1">Daily sales — Cash vs Credit / Salary deduct</h2><button class="btn sm" id="btnDailyCsv">Export CSV</button></div>
       <div style="overflow:auto"><table class="daily" id="dailyTable"></table></div>
@@ -912,10 +924,10 @@ function openSlip(rows, info){
   if (!rows || !rows.length) return;
   const isEmp = rows[0].custCat === CAT.employee;
   const slip = slipHtml(rows, info), auth = isEmp ? authHtml(rows, info) : '';
-  const chk = (id, label, on) => '<label style="color:#fff;display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-size:13px"><input type="checkbox" id="' + id + '" style="width:auto"' + (on ? ' checked' : '') + '> ' + label + '</label>';
+  const chk = (id, label, on) => '<label style="color:#fff;display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)))"><input type="checkbox" id="' + id + '" style="width:auto"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Print · Control No. ' + esc(rows[0]._ctrl || '') + '</h3>' +
     chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) : '') +
-    '<button class="btn green" id="doPrint" style="font-size:15px;padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
+    '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap">' + slip + auth + '</div></div></div>';
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => {
@@ -934,22 +946,23 @@ function groupsOf(rows){
   rows.forEach(r => { const k = r._pending ? 'P:' + r._uid : (r._ctrl || ('~' + r.customer + '|' + r.custCat)); if (!g.has(k)) g.set(k, []); g.get(k).push(r); });
   return g;
 }
+const DAY_OPEN = new Set();   // sales currently expanded (kept while the page refreshes)
 function renderDay(){
   const d = $('dDate').value;
   const rows = ROWS.filter(r => r._date === d).sort((a, b) => a._row - b._row);
   const tot = rows.reduce((a, r) => a + r._amt, 0), kg = rows.reduce((a, r) => a + r._kg, 0);
   const byCat = sumBy(rows, r => r.custCat === CAT.employee ? 'EMPLOYEE' + (companyOf(r) ? ' · ' + companyOf(r) : '') : r.custCat, r => r._amt);
-  $('dayStats').innerHTML = '<div class="stat main"><div class="glabel">Total amount</div><div class="v">' + peso(tot) + '</div></div>' +
-    '<div class="stat dark"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
-    [...byCat.entries()].sort((a, b) => b[1] - a[1]).map(([c, v]) => '<div class="stat"><div class="glabel">' + esc(c) + '</div><div class="v" style="font-size:16px">' + peso(v) + '</div></div>').join('');
+  const nSales = groupsOf(rows).size;
+  $('dayInfo').textContent = rows.length ? nSales + ' sale(s) · ' + rows.length + ' line(s) — click a sale to show its products' : '';
   if (!rows.length){ $('dayTable').innerHTML = '<tr><td class="muted" style="padding:20px;text-align:center">No entries on ' + fmtDate(d) + '.</td></tr>'; return; }
   let h = '<thead><tr><th>Product</th><th class="n">Kg</th><th class="n">Rate</th><th class="n">Amount</th><th></th></tr></thead><tbody>';
+  let gi = 0;
   groupsOf(rows).forEach((list, gk) => {
-    const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0);
+    const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0), open = DAY_OPEN.has(gk), g = 'g' + (gi++);
     const badge = r0.custCat === CAT.employee ? '<span class="badge b-EMP">EMP ' + esc(companyOf(r0)) + '</span>' : '<span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span>';
-    h += '<tr class="sub-tot grp"><td colspan="3">' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>' : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
+    h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (r0._pending ? ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>' : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
       '<td style="text-align:right"><button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
-    h += list.map(r => '<tr><td>' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
+    h += list.map(r => '<tr class="ln ' + g + (open ? '' : ' hidden') + '"><td style="padding-left:calc(18px * var(--fs) + 14px)">' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
       '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
   });
   h += '<tr class="sub-tot"><td>TOTAL (' + rows.length + ' lines)</td><td class="n">' + kgf(kg) + '</td><td></td><td class="n">' + peso(tot) + '</td><td></td></tr></tbody>';
@@ -1016,12 +1029,6 @@ function renderSummary(){
   const v = ROWS.filter(r => (!f.from || r._date >= f.from) && (!f.to || r._date <= f.to) && (!f.rep || r.rep === f.rep) && (!f.cat || r.custCat === f.cat) && (!f.prod || r._prod === f.prod));
   const tot = v.reduce((a, r) => a + r._amt, 0), kg = v.reduce((a, r) => a + r._kg, 0);
   const paid = v.reduce((a, r) => a + r._pay, 0), bal = v.reduce((a, r) => a + Math.max(0, r._bal), 0);
-  $('sumStats').innerHTML =
-    '<div class="stat main"><div class="glabel">Total amount</div><div class="v">' + peso(tot) + '</div></div>' +
-    '<div class="stat"><div class="glabel">Total kg</div><div class="v">' + kgf(kg) + '</div></div>' +
-    '<div class="stat"><div class="glabel">Paid</div><div class="v">' + peso(paid) + '</div></div>' +
-    '<div class="stat"><div class="glabel">Unpaid / salary deduction</div><div class="v">' + peso(bal) + '</div></div>' +
-    '<div class="stat"><div class="glabel">Lines / customers</div><div class="v">' + v.length + ' / ' + new Set(v.map(r => r.customer)).size + '</div></div>';
   const table = (title, src, kf, limit, byKey) => {
     const m = new Map();
     src.forEach(r => { const k = kf(r) || '(blank)'; const e = m.get(k) || {amt:0, kg:0}; e.amt += r._amt; e.kg += r._kg; m.set(k, e); });
@@ -1210,20 +1217,20 @@ async function uploadEmployees(file, company){
 function openSettings(){
   const s = settings(), c = conn();
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>Settings</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
-    '<h2 style="font-size:12px;color:var(--muted)">Connection</h2><div class="fgrid">' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted)">Connection</h2><div class="fgrid">' +
       '<div class="span2"><label>Web app URL</label><input id="stUrl" value="' + esc(c.url) + '"' + (HAS_GAS ? ' disabled' : '') + '></div>' +
       '<div><label>Access key</label><input id="stKey" type="text" autocomplete="off" value="' + esc(c.key) + '"' + (HAS_GAS ? ' disabled' : '') + '></div></div>' +
-    '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Salary deduction</h2>' +
-    '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
-    '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Salary deduction</h2>' +
+    '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)));color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
       '<div class="span2"><label>Company name</label><input id="stCo" value="' + esc(s.company) + '"></div>' +
       '<div class="span2"><label>Address</label><input id="stAddr" value="' + esc(s.address) + '"></div>' +
       '<div><label>Slip title</label><input id="stTitle" value="' + esc(s.title) + '"></div>' +
       '<div class="span2"><label>Logo (PNG/JPG)</label><input type="file" id="stLogo" accept="image/*"></div>' +
       '<div style="display:flex;align-items:center;gap:8px"><img src="' + esc(s.logo || DEFAULT_LOGO) + '" style="height:40px"><button class="btn sm" id="stLogoReset">Default logo</button></div></div>' +
-    '<h2 style="font-size:12px;color:var(--muted);margin-top:16px">Rates &amp; lists backup</h2>' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Rates &amp; lists backup</h2>' +
     '<p class="hint" style="margin-top:0">Lists are shared by all users and kept in hidden tabs of your Google Sheet. A backup file is a handy extra copy.</p>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="stBackup">⬇ Download backup</button><label class="btn sm" style="margin:0;text-transform:none;font-size:12px;color:var(--ink)">⬆ Restore from backup<input type="file" id="stRestore" accept=".json" class="hidden"></label></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="stBackup">⬇ Download backup</button><label class="btn sm" style="margin:0;text-transform:none;font-size:max(10px, calc(12px * var(--fs)));color:var(--ink)">⬆ Restore from backup<input type="file" id="stRestore" accept=".json" class="hidden"></label></div>' +
     '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="stSave">Save settings</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
   let logo = s.logo;
@@ -1258,6 +1265,15 @@ window.addEventListener('offline', () => { setOnline(false); toast('Internet los
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
 $('btnDailyCsv').onclick = exportDaily;
 $('btnSettings').onclick = openSettings;
+// text size: 50% (default) · 75% · 100% — remembered on this computer
+const FS_STEPS = [0.5, 0.75, 1];
+function applyFs(v){ document.documentElement.style.setProperty('--fs', v); $('fsLabel').textContent = Math.round(v * 100) + '%'; store('fs', String(v)); }
+applyFs(FS_STEPS.includes(+store('fs')) ? +store('fs') : 0.5);
+document.querySelectorAll('[data-fs]').forEach(b => b.onclick = () => {
+  const cur = FS_STEPS.indexOf(+getComputedStyle(document.documentElement).getPropertyValue('--fs')) ;
+  const d = +b.dataset.fs, i = d === 0 ? 0 : Math.max(0, Math.min(FS_STEPS.length - 1, (cur < 0 ? 0 : cur) + d));
+  applyFs(FS_STEPS[i]);
+});
 $('cShow').addEventListener('change', () => $('cKey').type = $('cShow').checked ? 'text' : 'password');
 $('cGo').onclick = () => {
   const url = $('cUrl').value.trim(), k = $('cKey').value.trim().replace(/^['"]|['"]$/g, '');
@@ -1304,7 +1320,17 @@ lb.addEventListener('keydown', e => {
   else tr.nextElementSibling.querySelector('input').focus();
 });
 $('dDate').addEventListener('change', renderDay);
+$('dayExpand').onclick = () => { groupsOf(ROWS.filter(r => r._date === $('dDate').value)).forEach((v, k) => DAY_OPEN.add(k)); renderDay(); };
+$('dayCollapse').onclick = () => { DAY_OPEN.clear(); renderDay(); };
 $('dayTable').addEventListener('click', e => {
+  const head = e.target.closest('tr.clk');
+  if (head && !e.target.closest('button')){
+    const gk = head.dataset.gk, open = !DAY_OPEN.has(gk);
+    open ? DAY_OPEN.add(gk) : DAY_OPEN.delete(gk);
+    $('dayTable').querySelectorAll('tr.' + head.dataset.grp).forEach(tr => tr.classList.toggle('hidden', !open));
+    head.querySelector('.caret').textContent = open ? '▾' : '▸';
+    return;
+  }
   const p = e.target.closest('[data-print]');
   if (p){ const g = groupsOf(ROWS.filter(r => r._date === $('dDate').value)).get(p.dataset.print); if (g) openSlip(g); return; }
   const b = e.target.closest('[data-edit],[data-del]'); if (!b) return;
@@ -1348,6 +1374,10 @@ renderLtabs();
 setModes(CAT.walkin); setCustList();
 if (AUTO_REFRESH_MIN) setInterval(() => { if (ONLINE && !$('modalRoot').innerHTML && !LEDIT.dirty && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#tab-entry'))) load(true); }, AUTO_REFRESH_MIN * 60000);
 loadDeviceState().then(() => load());
+</script>
+<script>
+(function(){function h(){var e=document.querySelector('header.top');if(e)document.documentElement.style.setProperty('--hdr',e.offsetHeight+'px');}
+window.addEventListener('resize',h);window.addEventListener('load',h);document.addEventListener('click',function(){setTimeout(h,0)});setTimeout(h,0);})();
 </script>
 </body>
 </html>
