@@ -91,12 +91,21 @@
     <div class="tab" data-tab="lists">Rates &amp; Lists</div>
   </div>
   <button class="btn ghost" id="btnRefresh" title="Reload from Google Sheet">⟳</button>
+  <button class="btn ghost" id="btnConn" title="Connection settings">⚙</button>
   <a class="btn ghost hidden" id="lnkSheet" target="_blank" style="text-decoration:none">Sheet ↗</a>
 </header>
 
 <main>
-  <div id="noGas" class="card hidden" style="background:#fff6e0;border-color:#f0d58a;margin-bottom:12px">
-    Open this dashboard through your Apps Script <b>web app link</b> (see the setup guide). It needs that link to read and save to your Google Sheet.
+  <div id="connectBox" class="card hidden" style="background:#fff6e0;border-color:#f0d58a;margin-bottom:12px">
+    <h2 style="color:#7a5a00">Connect to your Google Sheet</h2>
+    <p class="hint" style="margin-top:0">Paste your Apps Script <b>Web app URL</b> (ends with <code>/exec</code>) and the <b>access key</b> you set as API_KEY in Code.gs.
+      These are saved only in this browser.</p>
+    <div class="fgrid">
+      <div class="span2"><label>Web app URL</label><input id="cUrl" placeholder="https://script.google.com/macros/s/…/exec"></div>
+      <div><label>Access key</label><input id="cKey" type="password"></div>
+      <div style="display:flex;align-items:flex-end"><button class="btn green" id="cGo" style="width:100%">Connect</button></div>
+    </div>
+    <div class="warn" id="cErr" style="margin-top:8px;font-size:13px"></div>
   </div>
 
   <!-- ================= ENTER SALES ================= -->
@@ -203,6 +212,8 @@ let SOURCE = 'MCP';
 const CASH_MODE = 'CASH :  OFFICE CASHIER';      // default mode for walk-in
 const CREDIT_MODE = 'CREDIT';                    // default mode for employees / volume buyers
 const AUTO_REFRESH_MIN = 5;
+// Optional: paste your Apps Script Web app URL here so users only need to type the access key.
+const DEFAULT_API_URL = '';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const HAS_GAS = typeof google !== 'undefined' && google.script && google.script.run;
@@ -237,7 +248,24 @@ function prodFrom(p){ const s = String(p||'').toUpperCase(); for (const c of ['P
 const isCredit = m => /CREDIT/i.test(m || '');
 function toast(msg, err){ const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg; document.body.appendChild(t); setTimeout(() => t.remove(), err ? 7000 : 3000); }
 function store(k, v){ try { if (v === undefined) return localStorage.getItem('sml_'+k); localStorage.setItem('sml_'+k, v); } catch(e){ return null; } }
-function api(fn, ...args){ return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args)); }
+function conn(){ return {url: store('apiUrl') || DEFAULT_API_URL, key: store('apiKey') || ''}; }
+async function api(fn, ...args){
+  if (HAS_GAS) return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(rej)[fn](...args));
+  const c = conn();
+  if (!c.url || !c.key) throw new Error('NOT_CONNECTED');
+  let res, data;
+  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args})}); }
+  catch (e){ throw new Error('Cannot reach the web app. Check the URL and that the deployment access is "Anyone".'); }
+  try { data = await res.json(); }
+  catch (e){ throw new Error('The web app did not answer correctly. Make sure "Who has access" is set to "Anyone" and you deployed a new version.'); }
+  if (!data.ok) throw new Error(data.error || 'Unknown error');
+  return data.result;
+}
+function showConnect(msg){
+  const c = conn();
+  $('cUrl').value = c.url; $('cKey').value = c.key; $('cErr').textContent = msg || '';
+  $('connectBox').classList.remove('hidden');
+}
 const catLabel = c => c === CAT.employee ? 'EMPLOYEE (' + c + ')' : c;
 function sumBy(rows, kf, vf){ const m = new Map(); rows.forEach(r => { const k = kf(r) || '(blank)'; m.set(k, (m.get(k)||0) + vf(r)); }); return m; }
 
@@ -289,7 +317,7 @@ function enrich(o){
   return o;
 }
 async function load(silent){
-  if (!HAS_GAS){ $('noGas').classList.remove('hidden'); $('status').textContent = 'Not connected'; return; }
+  if (!HAS_GAS && (!conn().url || !conn().key)){ showConnect(); $('status').textContent = 'Not connected'; return; }
   if (!silent) $('status').textContent = 'Loading…';
   try {
     const d = await api('getData');
@@ -300,7 +328,12 @@ async function load(silent){
     buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters(); renderSummary();
     if (!LEDIT.dirty) openList(LEDIT.key || 'rates');
     $('status').textContent = ROWS.length.toLocaleString() + ' sales lines · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-  } catch (e){ $('status').textContent = 'Error loading'; toast('Error: ' + (e.message || e), true); }
+    $('connectBox').classList.add('hidden');
+  } catch (e){
+    $('status').textContent = 'Error loading';
+    const msg = e.message || String(e);
+    if (!HAS_GAS) showConnect(msg); else toast('Error: ' + msg, true);
+  }
 }
 
 /* ================= ENTRY FORM ================= */
@@ -572,6 +605,13 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   ['entry','summary','lists'].forEach(n => $('tab-' + n).classList.toggle('hidden', n !== t.dataset.tab));
 });
 $('btnRefresh').onclick = () => load();
+$('btnConn').onclick = () => { if (HAS_GAS) return toast('Connected directly through Apps Script.'); showConnect(); };
+$('cGo').onclick = () => {
+  const url = $('cUrl').value.trim(), k = $('cKey').value.trim();
+  if (!/^https:\/\/script\.google(usercontent)?\.com\//.test(url)) { $('cErr').textContent = 'The URL should start with https://script.google.com/macros/s/…'; return; }
+  if (!k) { $('cErr').textContent = 'Enter the access key.'; return; }
+  store('apiUrl', url); store('apiKey', k); $('cErr').textContent = 'Connecting…'; load();
+};
 $('eCust').addEventListener('input', () => onCustomer());
 $('eCust').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); onCustomer(); $('lineBody').querySelector('input').focus(); } });
 $('eCatOverride').addEventListener('change', () => { lastAutoCust = ''; onCustomer(); });
