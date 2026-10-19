@@ -64,6 +64,15 @@
   .sub-tot td{font-weight:700;background:#fafbf8}
   .ctrl{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;color:var(--brand);font-weight:700}
   .bar{height:8px;background:var(--brand2);border-radius:4px;min-width:2px}
+  .daily{font-size:13px;border-collapse:collapse;min-width:980px}
+  .daily th,.daily td{border:1px solid #c9d3e0;padding:5px 8px;white-space:nowrap}
+  .daily thead th{color:#fff;text-transform:none;letter-spacing:0;font-size:13px;text-align:center;font-weight:700}
+  .daily .hAll{background:#1f4e79}.daily .hCash{background:#5b8c32}.daily .hCred{background:#c55a11}
+  .daily td{text-align:right}.daily td.l{text-align:left}
+  .daily tr.tot td{background:#fbe3d6;font-weight:800}
+  .daily tr.avg td{background:#dde9f6;font-weight:800}
+  .daily tr.shr td{background:#e9f0f8;font-weight:800}
+  .daily tr.today td{color:#1f6fb8;font-weight:700}
   .sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
   .ltabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
   .ltab{padding:7px 12px;border-radius:8px;cursor:pointer;background:#e6ebe4;font-weight:600;font-size:13px}
@@ -172,18 +181,14 @@
           <div><label>Date</label><input type="date" id="eDate"></div>
           <div><label>Representative</label><select id="eRep"></select></div>
           <div class="span2"><label>Customer</label>
-            <input id="eCust" list="dl-customers" placeholder="Type name — volume buyer / employee / walk-in" autocomplete="off">
-            <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span>
-              <span class="hint" id="eCatWhy"></span>
-              <span style="flex:1"></span>
-              <select id="eCatOverride" title="Change category for this sale"><option value="">Auto</option></select></div>
-          </div>
-          <div><label>Mode of payment</label><input id="eMode" list="dl-mode"></div>
-          <div><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
-          <div><label>DR # <span style="color:var(--accent)">*</span></label><input id="eDr"></div>
-          <div><label>Inhouse DR # <span style="color:var(--accent)">*</span></label><input id="eIdr"></div>
-          <div><label>S.I #</label><input id="eSi"></div>
-          <div><label>SO #</label><input id="eSo"></div>
+            <input id="eCust" list="dl-customers" placeholder="Type name — volume buyer / employee / walk-in" autocomplete="off"></div>
+          <div class="span2"><label>Customer category</label>
+            <select id="eCatOverride" title="Auto = detected from the Volume Buyers / Employees lists"><option value="">Auto</option></select>
+            <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span><span class="hint" id="eCatWhy"></span></div></div>
+          <div><label>Mode of payment</label><select id="eMode"></select></div>
+          <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
+          <div><label>DR / IND # <span style="color:var(--accent)">*</span></label>
+            <div style="display:flex;gap:6px"><select id="eDocType" style="width:78px;flex:none"><option value="DR">DR</option><option value="IND">IND</option></select><input id="eDocNo" placeholder="Number"></div></div>
           <div class="span2"><label>Remarks</label><input id="eRemarks"></div>
         </div>
 
@@ -239,6 +244,10 @@
       </div>
     </div>
     <div class="stats" id="sumStats"></div>
+    <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
+      <div style="display:flex;align-items:center;padding:10px 14px"><h2 style="margin:0;flex:1">Daily sales — Cash vs Credit / Salary deduct</h2><button class="btn sm" id="btnDailyCsv">Export CSV</button></div>
+      <div style="overflow:auto"><table class="daily" id="dailyTable"></table></div>
+    </div>
     <div class="sgrid" id="sumTables"></div>
   </section>
 
@@ -507,13 +516,24 @@ function onCustomer(keepMode){
   const ck = key($('eCust').value) + '|' + e.cat;
   if ((!keepMode || !$('eMode').value) && ck !== lastAutoCust){
     lastAutoCust = ck;
-    if (e.cat === CAT.volume){ const vb = e.vb || {}; $('eMode').value = vb.mode || CREDIT_MODE; $('eTerms').value = isBlank(vb.terms) ? '' : vb.terms; }
-    else if (e.cat === CAT.employee){ $('eMode').value = CREDIT_MODE; $('eTerms').value = 0; }
-    else { $('eMode').value = CASH_MODE; $('eTerms').value = ''; }
+    if (e.cat === CAT.volume){ const vb = e.vb || {}; setModes(e.cat, /CASH/i.test(vb.mode || '') ? CASH_MODE : CREDIT_MODE); $('eTerms').value = isBlank(vb.terms) ? '' : vb.terms; }
+    else if (e.cat === CAT.employee){ setModes(e.cat); $('eTerms').value = 0; }
+    else { setModes(e.cat); $('eTerms').value = ''; }
   }
+  syncTerms();
   $('lineBody').querySelectorAll('tr').forEach(tr => applyRate(tr, false));
   recalc();
 }
+/** Mode of payment follows the category: Walk-in = Cash · Employee = Salary deduction · Volume buyer = Credit or Cash. */
+function setModes(cat, preferred){
+  const sel = $('eMode');
+  const opts = cat === CAT.volume ? [[CREDIT_MODE, 'Credit'], [CASH_MODE, 'Cash']]
+    : cat === CAT.employee ? [[CREDIT_MODE, 'Salary deduction']] : [[CASH_MODE, 'Cash']];
+  sel.innerHTML = opts.map(o => '<option value="' + esc(o[0]) + '">' + o[1] + '</option>').join('');
+  sel.value = preferred && opts.some(o => o[0] === preferred) ? preferred : opts[0][0];
+  sel.disabled = opts.length === 1;
+}
+function syncTerms(){ $('eTermsBox').classList.toggle('hidden', !(effective().cat === CAT.volume && isCredit($('eMode').value))); }
 function applyRate(tr, force){
   const p = tr.querySelector('[data-l=particulars]').value.trim();
   const rateEl = tr.querySelector('[data-l=rate]'), info = tr.querySelector('[data-info]');
@@ -544,12 +564,12 @@ function recalc(){
   $('tPaid').textContent = isCredit($('eMode').value) ? (effective().cat === CAT.employee ? 'Salary deduction' : 'Charged (unpaid)') : 'Paid in full';
 }
 function buildRows(){
-  const date = $('eDate').value, e = effective(), mode = $('eMode').value.trim(), terms = $('eTerms').value.trim();
+  const date = $('eDate').value, e = effective(), mode = $('eMode').value.trim(), terms = $('eTermsBox').classList.contains('hidden') ? (e.cat === CAT.employee ? '0' : '') : $('eTerms').value.trim();
   const today = todayISO(), credit = isCredit(mode), due = credit ? addDays(date, num(terms)) : '';
   const lines = [...$('lineBody').querySelectorAll('tr')].map(lineValues).filter(v => v.particulars || v.weight || v.amount);
   const errs = [];
   if (!date) errs.push('date'); if (!$('eRep').value) errs.push('representative'); if (!$('eCust').value.trim()) errs.push('customer');
-  if (!$('eDr').value.trim()) errs.push('DR #'); if (!$('eIdr').value.trim()) errs.push('Inhouse DR #');
+  if (!$('eDocNo').value.trim()) errs.push($('eDocType').value + ' #');
   if (e.cat === CAT.employee && !e.company) errs.push('employee company');
   if (!lines.length) errs.push('at least one product line');
   lines.forEach((v, i) => { if (!v.particulars || !v.amount || !v.weight) errs.push('line ' + (i+1) + ' (product, weight and rate)'); });
@@ -561,14 +581,14 @@ function buildRows(){
     return {rep: $('eRep').value, source: SOURCE, custCat: e.cat, date, month: MONTHS[+date.slice(5,7) - 1], customer: $('eCust').value.trim(),
       particulars: v.particulars, prodCat: v.prodCat, heads: v.heads, weight: v.weight,
       rate: v.unit === 'HEAD' ? r2(v.amount / v.weight) : v.rate, amount: v.amount, payment: pay || '',
-      withhold: false, balance: bal, mode, terms, so: $('eSo').value.trim(), dr: $('eDr').value.trim(), inhouseDr: $('eIdr').value.trim(), si: $('eSi').value.trim(),
+      withhold: false, balance: bal, mode, terms, dr: $('eDocType').value === 'DR' ? $('eDocNo').value.trim() : '', inhouseDr: $('eDocType').value === 'IND' ? $('eDocNo').value.trim() : '',
       due, daysOverdue: bal > 0 && due ? Math.max(0, daysBetween(due, today)) : '-',
       payStatus: bal <= 0.005 ? 'PAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks};
   });
   return {rows, info: {emp: e.emp, company: e.company}};
 }
 function clearForm(){
-  ['eCust','eDr','eIdr','eSi','eSo','eRemarks'].forEach(id => $(id).value = '');
+  ['eCust','eDocNo','eRemarks'].forEach(id => $(id).value = '');
   $('eCatOverride').value = ''; lastAutoCust = '';
   $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
   $('eCust').focus();
@@ -624,7 +644,7 @@ function slipHtml(rows, info){
       '</div>' +
       '<div style="display:grid;gap:4px;grid-template-columns:1fr">' +
         R('Control No.:', '<b>' + esc(ctrl) + '</b>') + R('Payment Option:', payOpt) + R('Terms:', isBlank(r0.terms) || num(r0.terms) === 0 ? '' : esc(r0.terms) + ' days') +
-        R('DR #:', esc(r0.dr)) + R('Inhouse DR #:', esc(r0.inhouseDr)) + R('S.I #:', esc(r0.si)) + R('SO #:', esc(r0.so)) +
+        (r0.inhouseDr && !r0.dr ? R('IND #:', esc(r0.inhouseDr)) : R('DR #:', esc(r0.dr)) + (r0.inhouseDr ? R('IND #:', esc(r0.inhouseDr)) : '')) +
       '</div>' +
     '</div>' +
     '<table><thead><tr><th style="width:36px">No.</th><th>Item Description</th><th style="width:70px">Qnty</th><th style="width:50px">Units</th><th style="width:80px">Rate</th><th style="width:100px">Amount</th></tr></thead><tbody>' + lines +
@@ -647,7 +667,7 @@ function authHtml(rows, info){
   const lvl = /manag/i.test(grp) ? 'M' : /supervis|pro-?tech|technical|professional/i.test(grp) ? 'P' : /rank/i.test(grp) ? 'R' : '';
   const box = c => '( ' + (lvl === c ? '✔' : '&nbsp;&nbsp;') + ' )';
   const name = esc(emp ? displayName(emp.name) : r0.customer);
-  const refs = ['Sales Slip Control No. ' + esc(r0._ctrl || ''), r0.dr ? 'DR# ' + esc(r0.dr) : '', r0.inhouseDr ? 'IDR# ' + esc(r0.inhouseDr) : '', slashDate(r0._date)].filter(Boolean).join(' · ');
+  const refs = ['Sales Slip Control No. ' + esc(r0._ctrl || ''), r0.dr ? 'DR# ' + esc(r0.dr) : '', r0.inhouseDr ? 'IND# ' + esc(r0.inhouseDr) : '', slashDate(r0._date)].filter(Boolean).join(' · ');
   return '<div class="auth">' +
     '<div class="ah"><div class="lbox"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""></div>' +
       '<div class="tag">TAGGED UNDER: <span>' + esc(company || '') + '</span><br>ID NO: <span>' + esc((emp && emp.empNo) || '') + '</span></div></div>' +
@@ -713,7 +733,7 @@ function renderDay(){
 function openEdit(r){
   const F = [['date','Date','date',r._date],['rep','Representative','rep',r.rep],['customer','Customer','text',r.customer],['custCat','Customer category','cat',r.custCat],
     ['particulars','Product','prod',r.particulars],['heads','Heads','text',r.heads],['weight','Weight (kg)','number',r._kg],['rate','Rate (per kg)','number',r._rate],
-    ['amount','Amount','number',r._amt],['mode','Mode of payment','mode',r.mode],['terms','Terms','number',r.terms],['dr','DR #','text',r.dr],['inhouseDr','Inhouse DR #','text',r.inhouseDr],['si','S.I #','text',r.si],['so','SO #','text',r.so],['remarks','Remarks','text',r.remarks]];
+    ['amount','Amount','number',r._amt],['mode','Mode of payment','mode',r.mode],['terms','Terms','number',r.terms],['dr','DR #','text',r.dr],['inhouseDr','IND #','text',r.inhouseDr],['remarks','Remarks','text',r.remarks]];
   const inp = ([k, l, t, v]) => {
     let el;
     if (t === 'rep') el = '<select data-f="rep">' + LISTS.reps.map(o => '<option' + (o.name === v ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('') + (LISTS.reps.some(o => o.name === v) ? '' : '<option selected>' + esc(v) + '</option>') + '</select>';
@@ -776,11 +796,56 @@ function renderSummary(){
       (rows.length ? rows.map(([k, e]) => '<tr><td>' + esc(byKey ? fmtDate(k) : k) + '</td><td class="n">' + kgf(e.kg) + '</td><td class="n">' + peso(e.amt) + '</td><td><div class="bar" style="width:' + (e.amt / max * 100).toFixed(1) + '%"></div></td></tr>').join('') : '<tr><td colspan="4" class="muted">No data</td></tr>') +
       '<tr class="sub-tot"><td>Total</td><td class="n">' + kgf(rows.reduce((a, e) => a + e[1].kg, 0)) + '</td><td class="n">' + peso(rows.reduce((a, e) => a + e[1].amt, 0)) + '</td><td></td></tr></tbody></table></div></div>';
   };
+  renderDaily(v, f);
   const empRows = v.filter(r => r.custCat === CAT.employee);
   $('sumTables').innerHTML = table('By product category', v, r => r._prod) + table('By customer category', v, r => r.custCat) +
     table('Employees by company', empRows, r => companyOf(r) || '(no company tag)') +
     table('By representative', v, r => r.rep) + table('Daily totals', v, r => r._date, 0, true) +
     table('Top 15 products', v, r => r.particulars, 15) + table('Top 15 customers', v, r => r.customer, 15);
+}
+/* ---------- daily Cash vs Credit / Salary-deduct analysis ---------- */
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+// Credit/Salary deduct = any salary-deduction customer OR a credit mode of payment; everything else = Cash
+const isCreditSale = r => r.custCat === CAT.employee || /SALARY/i.test(r.custCat) || isCredit(r.mode);
+let DAILY = [];
+function renderDaily(v, f){
+  const m = new Map();
+  v.forEach(r => {
+    if (!r._date) return;
+    const e = m.get(r._date) || {d:r._date, n:0, kg:0, amt:0, cn:0, ckg:0, camt:0, xn:0, xkg:0, xamt:0};
+    e.n++; e.kg += r._kg; e.amt += r._amt;
+    if (isCreditSale(r)) { e.xn++; e.xkg += r._kg; e.xamt += r._amt; } else { e.cn++; e.ckg += r._kg; e.camt += r._amt; }
+    m.set(r._date, e);
+  });
+  const days = [...m.values()].sort((a, b) => a.d.localeCompare(b.d));
+  DAILY = days;
+  const T = days.reduce((a, e) => { Object.keys(a).forEach(k => a[k] += e[k]); return a; }, {n:0, kg:0, amt:0, cn:0, ckg:0, camt:0, xn:0, xkg:0, xamt:0});
+  const nd = days.length || 1;
+  const months = [...new Set(days.map(e => e.d.slice(0, 7)))];
+  const totLabel = months.length === 1 ? MONTHS[+months[0].slice(5) - 1].toUpperCase() + ' TOTAL' : 'TOTAL';
+  const N = x => x ? Math.round(x).toLocaleString('en-PH') : '-';
+  const K = x => x ? x.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2}) : '-';
+  const P = x => x ? peso(x) : '-';
+  const dayOf = iso => { const [y, mo, d] = iso.split('-').map(Number); return DAYS[new Date(y, mo - 1, d).getDay()]; };
+  const cells = e => '<td>' + N(e.n) + '</td><td>' + K(e.kg) + '</td><td>' + P(e.amt) + '</td><td>' + N(e.cn) + '</td><td>' + K(e.ckg) + '</td><td>' + P(e.camt) + '</td><td>' + N(e.xn) + '</td><td>' + K(e.xkg) + '</td><td>' + P(e.xamt) + '</td>';
+  const avg = {}; Object.keys(T).forEach(k => avg[k] = T[k] / nd);
+  const today = todayISO();
+  $('dailyTable').innerHTML =
+    '<thead><tr><th class="hAll" rowspan="2" colspan="2"></th><th class="hAll" colspan="3" rowspan="2">ALL SALES</th><th class="hAll" colspan="6">BREAKDOWN OF ALL SALES</th></tr>' +
+    '<tr><th class="hCash" colspan="3">CASH</th><th class="hCred" colspan="3">CREDIT / SALARY DEDUCT</th></tr>' +
+    '<tr><th class="hAll">Date</th><th class="hAll">Day</th><th class="hAll">Transactions</th><th class="hAll">Weight (kg)</th><th class="hAll">Amount (₱)</th>' +
+    '<th class="hCash"># of Transactions</th><th class="hCash">Weight (kg)</th><th class="hCash">Amount (₱)</th><th class="hCred"># of Transactions</th><th class="hCred">Weight (kg)</th><th class="hCred">Amount (₱)</th></tr></thead><tbody>' +
+    (days.length ? days.map(e => '<tr' + (e.d === today ? ' class="today"' : '') + '><td class="l">' + slashDate(e.d) + '</td><td class="l">' + dayOf(e.d) + '</td>' + cells(e) + '</tr>').join('')
+      : '<tr><td class="l muted" colspan="11" style="text-align:center;padding:16px">No sales in the selected period.</td></tr>') +
+    '<tr class="tot"><td class="l" colspan="2">' + totLabel + '</td>' + cells(T) + '</tr>' +
+    '<tr class="avg"><td class="l" colspan="2">DAILY AVERAGE</td>' + cells(avg) + '</tr>' +
+    '<tr class="shr"><td class="l" colspan="2">% SHARE OF AMOUNT</td><td></td><td></td><td></td><td></td><td></td><td>' + (T.amt ? (T.camt / T.amt * 100).toFixed(1) + '%' : '-') + '</td><td></td><td></td><td>' + (T.amt ? (T.xamt / T.amt * 100).toFixed(1) + '%' : '-') + '</td></tr></tbody>';
+}
+function exportDaily(){
+  const head = ['Date','Day','Transactions','Weight (kg)','Amount','Cash # of Transactions','Cash Weight (kg)','Cash Amount','Credit/Salary Deduct # of Transactions','Credit/Salary Deduct Weight (kg)','Credit/Salary Deduct Amount'];
+  const dayOf = iso => { const [y, mo, d] = iso.split('-').map(Number); return DAYS[new Date(y, mo - 1, d).getDay()]; };
+  const lines = [head.join(',')].concat(DAILY.map(e => [slashDate(e.d), dayOf(e.d), e.n, r2(e.kg), r2(e.amt), e.cn, r2(e.ckg), r2(e.camt), e.xn, r2(e.xkg), r2(e.xamt)].join(',')));
+  download('daily-sales-' + todayISO() + '.csv', '\ufeff' + lines.join('\n'), 'text/csv');
 }
 function setRange(which){
   const t = todayISO();
@@ -942,6 +1007,7 @@ document.querySelectorAll('.tab').forEach(t => t.onclick = () => {
   ['entry','summary','lists'].forEach(n => $('tab-' + n).classList.toggle('hidden', n !== t.dataset.tab));
 });
 $('btnRefresh').onclick = () => load();
+$('btnDailyCsv').onclick = exportDaily;
 $('btnSettings').onclick = openSettings;
 $('cGo').onclick = () => {
   const url = $('cUrl').value.trim(), k = $('cKey').value.trim();
@@ -952,7 +1018,9 @@ $('cGo').onclick = () => {
 $('eCust').addEventListener('input', () => onCustomer());
 $('eCust').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); onCustomer(); $('lineBody').querySelector('input').focus(); } });
 $('eCatOverride').addEventListener('change', () => { lastAutoCust = ''; onCustomer(); });
-$('eMode').addEventListener('input', recalc);
+$('eMode').addEventListener('change', () => { syncTerms(); recalc(); });
+$('eDocType').value = store('docType') || 'DR';
+$('eDocType').addEventListener('change', () => store('docType', $('eDocType').value));
 $('eDate').addEventListener('change', () => { $('dDate').value = $('eDate').value; renderDay(); });
 $('eRep').addEventListener('change', () => store('rep', $('eRep').value));
 $('ePrintAfter').checked = store('printAfter') !== '0';
