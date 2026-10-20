@@ -236,6 +236,9 @@
   .ledger table.brk th{background:#555}
   .ledger .via{display:inline-block;padding:0 6px;border:1px solid #bbb;border-radius:3px;font-size:10px;font-weight:700}
   .ledger .via.v-QR{border-color:#1f4fa8;color:#1f4fa8}
+  .ledger .viaedit{display:inline-flex!important;align-items:center;gap:4px;margin:0!important;padding:1px 6px;border:1px dashed #1f4fa8;border-radius:3px;font-size:10px;font-weight:700;color:#1f4fa8;cursor:pointer;text-transform:none!important;letter-spacing:0!important;background:#f4f8ff}
+  .ledger .viaedit input{width:auto;margin:0}
+  .ledger .viaedit.on{background:#1f4fa8;color:#fff;border-style:solid}
   .ledger .dh{font-size:12px;letter-spacing:.12em;margin:16px 0 6px}
   .ledger .dens{display:grid;grid-template-columns:1fr 1fr 0.9fr;gap:16px;align-items:start}
   .ledger .dt{font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
@@ -1077,7 +1080,7 @@ function arHtml(rows){
   '</div>';
 }
 /** Daily cash ledger (Summary tab). */
-function ledgerHtml(date, no){
+function ledgerHtml(date, no, editable){
   const s = settings();
   const cash = ROWS.filter(r => r._date === date && !isCreditSale(r));
   const groups = [...groupsOf(cash).values()].sort((a, b) => String(a[0]._ctrl).localeCompare(String(b[0]._ctrl)));
@@ -1087,7 +1090,9 @@ function ledgerHtml(date, no){
     total += amt; kg += k; i++;
     const docs = [r0.dr ? 'DR ' + r0.dr : '', r0.inhouseDr ? 'IND ' + r0.inhouseDr : ''].filter(Boolean).join(' / ');
     const lines = list.map((r, j) => '<tr class="li">' +
-      (j === 0 ? '<td>' + i + '</td><td>' + esc(r0._ctrl || '') + (r0._pending ? ' ⏳' : '') + '</td><td>' + esc(docs) + '</td><td><b>' + esc(r0.customer) + '</b><br><span style="color:#666">' + esc(r0.custCat) + ' · ' + esc(r0.rep) + '</span></td><td><span class="via v-' + key(payVia(r0)) + '">' + esc(payVia(r0)) + '</span></td>'
+      (j === 0 ? '<td>' + i + '</td><td>' + esc(r0._ctrl || '') + (r0._pending ? ' ⏳' : '') + '</td><td>' + esc(docs) + '</td><td><b>' + esc(r0.customer) + '</b><br><span style="color:#666">' + esc(r0.custCat) + ' · ' + esc(r0.rep) + '</span></td><td>' + (editable && payVia(r0) !== 'Online/Bank'
+        ? '<label class="viaedit' + (isQR(r0.mode) ? ' on' : '') + '" title="Tick if paid via QR"><input type="checkbox" data-qr="' + esc(gkOf(r0)) + '"' + (isQR(r0.mode) ? ' checked' : '') + '> QR</label>'
+        : '<span class="via v-' + key(payVia(r0)) + '">' + esc(payVia(r0)) + '</span>') + '</td>'
                : '<td></td><td></td><td></td><td></td><td></td>') +
       '<td>' + esc(r.particulars) + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + money(r._rate) + '</td><td class="n">' + money(r._amt) + '</td></tr>').join('');
     return lines + '<tr class="st"><td colspan="6" style="text-align:right">Total · ' + esc(r0._ctrl || r0.customer) + ' (' + esc(payVia(r0)) + ')</td><td class="n">' + kgf(k) + '</td><td></td><td class="n">' + money(amt) + '</td></tr>';
@@ -1142,12 +1147,33 @@ async function openLedger(){
   const btn = $('btnLedger'); btn.disabled = true;
   const no = await ledgerNo(d);
   btn.disabled = false;
-  const html = ledgerHtml(d, no);
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Daily cash ledger · ' + esc(fmtDate(d)) + (no ? ' · No. ' + esc(no) : '') + '</h3>' +
+    '<span class="hint" style="color:#ccc">Tick <b>QR</b> for sales paid via QR — it is saved to the sheet</span>' +
     '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
-    '<div class="slipwrap">' + html + '</div></div></div>';
+    '<div class="slipwrap" id="ledWrap"></div></div></div>';
+  const draw = () => { $('ledWrap').innerHTML = ledgerHtml(d, no, true); };
+  draw();
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
-  $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + html + '</div>'; setTimeout(() => window.print(), 50); };
+  $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + ledgerHtml(d, no, false) + '</div>'; setTimeout(() => window.print(), 50); };
+  $('ledWrap').addEventListener('change', async e => {
+    const cb = e.target.closest('[data-qr]'); if (!cb) return;
+    const list = groupsOf(ROWS.filter(r => r._date === d && !isCreditSale(r))).get(cb.dataset.qr) || [];
+    if (!list.length) return draw();
+    const mode = cb.checked ? QR_MODE : CASH_MODE;
+    if (list[0]._pending){   // not uploaded yet → change it on this computer
+      const sale = OUTBOX.find(x => x.uid === list[0]._uid);
+      if (sale){ sale.rows.forEach(x => x.mode = mode); await saveOutbox(); }
+      list.forEach(r => r.mode = mode); draw(); renderDay(); return;
+    }
+    if (needOnline('Changing the payment')) { cb.checked = !cb.checked; return; }
+    $('ledWrap').querySelectorAll('[data-qr]').forEach(x => x.disabled = true);
+    try {
+      await api('updateRows', list.map(r => ({row: r._row, check: {customer: r.customer, particulars: r.particulars}, changes: {mode}})));
+      list.forEach(r => r.mode = mode);
+      toast((list[0]._ctrl || list[0].customer) + (cb.checked ? ' marked as paid via QR ✓' : ' marked as cash ✓'));
+    } catch (err){ toast('Could not change it: ' + (err.message || err), true); }
+    draw(); renderDay();
+  });
 }
 /** Voluntary Payroll Deduction Authorization Form (printed automatically for salary deduction sales). */
 function longDate(iso){ if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return iso || ''; const [y,m,d] = iso.split('-'); return MONTHS[+m-1] + ' ' + (+d) + ', ' + y; }
@@ -1197,9 +1223,10 @@ function openSlip(rows, info){
 }
 
 /* ================= DAY PANEL ================= */
+const gkOf = r => r._pending ? 'P:' + r._uid : (r._ctrl || ('~' + r.customer + '|' + r.custCat));
 function groupsOf(rows){
   const g = new Map();
-  rows.forEach(r => { const k = r._pending ? 'P:' + r._uid : (r._ctrl || ('~' + r.customer + '|' + r.custCat)); if (!g.has(k)) g.set(k, []); g.get(k).push(r); });
+  rows.forEach(r => { const k = gkOf(r); if (!g.has(k)) g.set(k, []); g.get(k).push(r); });
   return g;
 }
 const DAY_OPEN = new Set();   // sales currently expanded (kept while the page refreshes)
