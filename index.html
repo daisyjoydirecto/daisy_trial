@@ -1340,11 +1340,14 @@ function renderDaily(v, f){
   const m = new Map();
   v.forEach(r => {
     if (!r._date) return;
-    const e = m.get(r._date) || {d:r._date, n:0, kg:0, amt:0, cn:0, ckg:0, camt:0, xn:0, xkg:0, xamt:0};
-    e.n++; e.kg += r._kg; e.amt += r._amt;
-    if (isCreditSale(r)) { e.xn++; e.xkg += r._kg; e.xamt += r._amt; } else { e.cn++; e.ckg += r._kg; e.camt += r._amt; }
+    const e = m.get(r._date) || {d:r._date, n:0, kg:0, amt:0, cn:0, ckg:0, camt:0, xn:0, xkg:0, xamt:0, _c:new Set(), _x:new Set()};
+    e.kg += r._kg; e.amt += r._amt;
+    // transactions = persons, not rows: each customer counts once per day as Cash and once as Credit/Salary deduct
+    const who = key(r.customer) || ('#' + r._row);
+    if (isCreditSale(r)) { e._x.add(who); e.xkg += r._kg; e.xamt += r._amt; } else { e._c.add(who); e.ckg += r._kg; e.camt += r._amt; }
     m.set(r._date, e);
   });
+  m.forEach(e => { e.cn = e._c.size; e.xn = e._x.size; e.n = e.cn + e.xn; delete e._c; delete e._x; });
   const days = [...m.values()].sort((a, b) => a.d.localeCompare(b.d));
   DAILY = days;
   const T = days.reduce((a, e) => { Object.keys(a).forEach(k => a[k] += e[k]); return a; }, {n:0, kg:0, amt:0, cn:0, ckg:0, camt:0, xn:0, xkg:0, xamt:0});
