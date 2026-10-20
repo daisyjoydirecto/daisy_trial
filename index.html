@@ -553,7 +553,7 @@ async function showSaved(){
     if (c.lists) applyLists(c.lists);
     const d = c.d;
     if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
-    ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); }).concat(pendingRows());
+    ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); })).concat(pendingRows());
     DATA_SINCE = d.since || ''; CACHE_AT = c.at;
     if (d.url){ $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden'); }
     buildIndex(); onCustomer(true); renderDay(); fillSummaryFilters();
@@ -762,7 +762,7 @@ async function load(silent, fresh){
       if (!LISTS.rates.length && c.lists) applyLists(c.lists);
     }
     if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
-    ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); });
+    ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); }), !fromCache);
     $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden');
     $('connectBox').classList.add('hidden');
     const listsChanged = !!d.lists && !fromCache;
@@ -1178,6 +1178,36 @@ async function ledgerNo(date){
     toast(e.offline ? 'Offline — the ledger control number will be given when you are online.' : 'Could not get the ledger number: ' + (e.message || e), true); return '';
   }
 }
+let LEDGER_Q = Promise.resolve();
+/* Paid-via choices made in the ledger are remembered on this computer until the sheet data shows them,
+   so a refresh that still carries the old value can never undo your choice. */
+const OVR_KEY = r => [r._date, r._ctrl || r.customer, r.particulars, r2(r._amt)].join('|');
+function ovrGet(){ try { return JSON.parse(localStorage.getItem('sml_payOvr') || '{}'); } catch(e){ return {}; } }
+function ovrPut(o){ try { localStorage.setItem('sml_payOvr', JSON.stringify(o)); } catch(e){} }
+function ovrSet(list, mode, remOf){ const o = ovrGet(), t = Date.now(); list.forEach(r => o[OVR_KEY(r)] = {mode, remarks: remOf(r), at: t}); ovrPut(o); }
+function ovrDrop(list){ const o = ovrGet(); list.forEach(r => delete o[OVR_KEY(r)]); ovrPut(o); }
+function applyOverrides(rows, fromSheet){
+  const o = ovrGet(); let changed = false;
+  if (!Object.keys(o).length) return rows;
+  rows.forEach(r => {
+    const k = OVR_KEY(r), v = o[k]; if (!v) return;
+    if (String(r.mode) === v.mode && String(r.remarks || '') === String(v.remarks || '')) { if (fromSheet){ delete o[k]; changed = true; } return; }   // the sheet has it now
+    if (Date.now() - v.at > 6 * 3600000) { delete o[k]; changed = true; return; }                                                   // forget after 6 hours
+    r.mode = v.mode; r.remarks = v.remarks;
+  });
+  if (changed) ovrPut(o);
+  return rows;
+}
+/** Update the copy kept on this computer (shown first when the dashboard opens). */
+function saveLocalCopy(){
+  IDB.get('cache').then(c => {
+    if (!c || !c.d) return;
+    const mi = c.d.keys.indexOf('mode') + 1, ri = c.d.keys.indexOf('remarks') + 1;
+    const byRow = new Map(ROWS.filter(r => !r._pending).map(r => [r._row, r]));
+    c.d.rows.forEach(a => { const r = byRow.get(a[0]); if (r){ if (mi) a[mi] = r.mode; if (ri) a[ri] = r.remarks; } });
+    return IDB.set('cache', c);
+  }).catch(() => {});
+}
 async function openLedger(){
   const d = $('ledDate').value || todayISO();
   if (DATA_SINCE && d < DATA_SINCE) return toast('This date is older than the loaded data — click "All" in the period buttons first, then print again.', true);
@@ -1207,19 +1237,34 @@ async function openLedger(){
     const mode = v === 'QR' ? QR_MODE : v === 'HYB' ? HYB_MODE : CASH_MODE;
     const remOf = r => { const base = stripQrTag(r.remarks); return v === 'HYB' ? '[QR ' + qr.toFixed(2) + ']' + (base ? ' | ' + base : '') : base; };
     const label = v === 'QR' ? 'paid via QR' : v === 'HYB' ? 'Cash ' + peso(r2(tot - qr)) + ' + QR ' + peso(qr) : 'paid via cash';
+    if (list[0]._pending && UPLOADING){   // it is being uploaded right now → wait, then change the uploaded rows
+      toast('Finishing the upload first…'); await UPLOADING;
+      const g2 = groupsOf(ROWS.filter(r => r._date === d && !isCreditSale(r)));
+      const up = [...g2.values()].find(l => l[0].customer === list[0].customer && !l[0]._pending && l.length === list.length && Math.abs(l.reduce((a, r) => a + r._amt, 0) - tot) < 0.005);
+      if (up){ list.length = 0; up.forEach(r => list.push(r)); }
+    }
     if (list[0]._pending){   // not uploaded yet → change it on this computer
       const sale = OUTBOX.find(x => x.uid === list[0]._uid);
       if (sale){ sale.rows.forEach(x => { x.remarks = remOf(x); x.mode = mode; }); await saveOutbox(); }
       list.forEach(r => { r.remarks = remOf(r); r.mode = mode; }); draw(); renderDay(); return;
     }
     if (needOnline('Changing the payment')) return draw();
-    $('ledWrap').querySelectorAll('[data-via]').forEach(x => x.disabled = true);
-    try {
-      await api('updateRows', list.map(r => ({row: r._row, check: {customer: r.customer, particulars: r.particulars}, changes: {mode, remarks: remOf(r)}})));
-      list.forEach(r => { r.remarks = remOf(r); r.mode = mode; });
-      toast((list[0]._ctrl || list[0].customer) + ' — ' + label + ' ✓');
-    } catch (err){ toast('Could not change it: ' + (err.message || err), true); }
+    // show it at once, save to the sheet in the background (changes are sent one after another)
+    const before = list.map(r => ({r, mode: r.mode, remarks: r.remarks}));
+    const payload = list.map(r => ({row: r._row, check: {customer: r.customer, particulars: r.particulars}, changes: {mode, remarks: remOf(r)}}));
+    ovrSet(list, mode, remOf);
+    list.forEach(r => { r.remarks = remOf(r); r.mode = mode; });
+    saveLocalCopy();
     draw(); renderDay();
+    const who = list[0]._ctrl || list[0].customer;
+    LEDGER_Q = LEDGER_Q.then(() => api('updateRows', payload))
+      .then(() => toast(who + ' — ' + label + ' · saved to the sheet ✓'))
+      .catch(err => {
+        ovrDrop(list);
+        before.forEach(b => { b.r.mode = b.mode; b.r.remarks = b.remarks; });
+        if ($('ledWrap')) draw(); renderDay();
+        toast('Could not save the payment for ' + who + ': ' + (err.message || err) + ' — it was changed back.', true);
+      });
   });
 }
 /** Voluntary Payroll Deduction Authorization Form (printed automatically for salary deduction sales). */
