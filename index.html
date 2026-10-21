@@ -85,6 +85,10 @@
   .qrchk{display:flex!important;align-items:center;gap:6px;margin:6px 0 0!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer}
   .qrchk input{width:auto;margin:0}
   .qrchk.hidden{display:none!important}
+  .paidchk{margin-top:8px!important;padding:5px 8px;border:1px solid #a8d59a;background:#f3faef;border-radius:3px}
+  .badge.b-UNPAID{background:#fdecec;color:#a01c1c;border-color:#e3b4b4}
+  .badge.b-PAID{background:#eaf6e4;color:#2e7d32;border-color:#a8d59a}
+  .btn.paidbtn{background:#fff;border:1px solid #2e7d32;color:#2e7d32;padding:.4em .8em;font-size:max(10px, calc(12.5px * var(--fs)))}
   .upstatus{margin:10px auto 0;max-width:720px;padding:9px 14px;border-radius:3px;font-weight:700;display:flex;gap:10px;align-items:center;justify-content:center}
   .upstatus.busy{background:#eef4ff;color:#1f4fa8;border:1px solid #b9cdf5}
   .upstatus.ok{background:#eaf6e4;color:#2e7d32;border:1px solid #a8d59a}
@@ -279,6 +283,8 @@
   .ledger .lno{float:right;margin-top:12px;color:#d00;font-family:'Times New Roman',serif;font-size:17px}
   .ledger .lno b{font-weight:400}
   .ledger .boxes.two{grid-template-columns:repeat(2,1fr)}
+  .ledger .unpaidbox{margin-top:10px;border:1px dashed #c62828;background:#fff5f5;padding:8px 10px;color:#8a1616;line-height:2}
+  .ledger .unpaidbox .up{display:inline-block;margin-right:14px;white-space:nowrap}
   .ledger tr.li td{border-bottom:1px dotted #e3e3e3}
   .ledger tr.st td{font-weight:700;background:#f7f7f7;border-bottom:1px solid #bbb;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .ledger table.brk{width:60%;margin-top:12px}
@@ -424,7 +430,8 @@
           <div><label>Mode of payment</label><select id="eMode"></select>
             <div class="qrrow" id="eQRBox"><select id="ePayVia" title="How the customer paid"><option value="CASH">Paid via cash</option><option value="QR">📱 Paid via QR</option><option value="HYB">Cash + QR (split)</option><option value="COD">🚚 COD (cash on delivery)</option></select>
               <input id="eQRAmt" class="hidden" type="number" min="0" step="any" placeholder="QR amount ₱"></div>
-            <div class="hint hidden" id="eSplitInfo"></div></div>
+            <div class="hint hidden" id="eSplitInfo"></div>
+            <label class="qrchk paidchk" id="ePaidBox"><input type="checkbox" id="ePaid"> <b>✔ Paid</b> <span class="hint">(cash received)</span></label></div>
           <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
           <div class="s2 s2r"><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div>
         </div>
@@ -1155,6 +1162,7 @@ function syncTerms(){
   $('eTermsBox').classList.toggle('hidden', !(effective().cat === CAT.volume && isCredit($('eMode').value)));
   const cashOk = !isCredit($('eMode').value) && effective().cat !== CAT.employee;
   $('eQRBox').classList.toggle('hidden', !cashOk); if (!cashOk) $('ePayVia').value = 'CASH';
+  $('ePaidBox').classList.toggle('hidden', !cashOk);
   syncSplit();
 }
 function syncSplit(){
@@ -1192,7 +1200,7 @@ function recalc(){
   });
   $('tLines').textContent = n; $('tKg').textContent = kgf(kg); $('tAmt').textContent = peso(amt);
   if (typeof syncSplit === 'function') syncSplit();
-  $('tPaid').textContent = isCredit($('eMode').value) ? (effective().cat === CAT.employee ? 'Salary deduction' : 'Charged (unpaid)') : 'Paid in full';
+  $('tPaid').textContent = isCredit($('eMode').value) ? (effective().cat === CAT.employee ? 'Salary deduction' : 'Charged (unpaid)') : ($('ePaid').checked ? 'Paid in full' : 'Cash — NOT yet paid');
 }
 function buildRows(){
   const date = $('eDate').value, e = effective(), mode0 = $('eMode').value.trim(), via = !isCredit(mode0) && e.cat !== CAT.employee ? $('ePayVia').value : 'CASH', mode = via === 'QR' ? QR_MODE : via === 'COD' ? COD_MODE : via === 'HYB' ? HYB_MODE : mode0, terms = $('eTermsBox').classList.contains('hidden') ? (e.cat === CAT.employee ? '0' : '') : $('eTerms').value.trim();
@@ -1224,13 +1232,14 @@ function buildRows(){
   if (via === 'HYB') remarks = '[QR ' + r2(num($('eQRAmt').value)).toFixed(2) + ']' + (remarks ? ' | ' + remarks : '');
   if (e.cat === CAT.employee) remarks = '[' + e.company + ']' + (e.empNo ? ' EMP# ' + e.empNo : '') + (e.emp && e.emp.dept && !e.manual ? ' · ' + e.emp.dept : '') + (remarks ? ' | ' + remarks : '');
   const rows = lines.map(v => {
-    const pay = credit ? 0 : v.amount, bal = r2(v.amount - pay);
+    const paidNow = !credit && $('ePaid').checked;
+    const pay = paidNow ? v.amount : 0, bal = r2(v.amount - pay);
     return {rep: $('eRep').value, source: SOURCE, custCat: e.cat, date, month: MONTHS[+date.slice(5,7) - 1], customer: $('eCust').value.trim(),
       particulars: v.particulars, prodCat: v.prodCat, heads: v.heads, weight: v.weight,
       rate: v.unit === 'HEAD' ? r2(v.amount / v.weight) : v.rate, amount: v.amount, payment: pay || '',
       withhold: false, balance: bal, mode, terms, dr: $('eDR').value.trim(), inhouseDr: $('eIDR').value.trim(),
       due, daysOverdue: bal > 0 && due ? Math.max(0, daysBetween(due, today)) : '-',
-      payStatus: bal <= 0.005 ? 'PAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks};
+      payStatus: bal <= 0.005 ? 'PAID' : !credit ? 'UNPAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks};
   });
   const empInfo = e.cat !== CAT.employee ? null : e.manual ? {empNo: e.empNo, name: $('eCust').value.trim(), payroll: e.emp && e.emp.payroll, position: e.emp && e.emp.position, dept: e.emp && e.emp.dept} : e.emp;
   return {rows, info: {emp: empInfo, company: e.company}};
@@ -1238,6 +1247,7 @@ function buildRows(){
 function clearForm(){
   ['eCust','eDR','eIDR','eRemarks','eEmpNo'].forEach(id => $(id).value = '');
   $('ePayVia').value = 'CASH'; $('eQRAmt').value = ''; syncSplit();
+  $('ePaid').checked = store('paidDefault') !== '0';
   lastAutoCust = ''; lastEmpFill = ''; autoEmpNo = '';
   $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
   $('eCust').focus();
@@ -1423,7 +1433,10 @@ function arHtml(rows){
 /** Daily cash ledger (Summary tab). */
 function ledgerHtml(date, no, editable){
   const s = settings();
-  const cash = ROWS.filter(r => r._date === date && !isCreditSale(r));
+  const allCash = ROWS.filter(r => r._date === date && !isCreditSale(r));
+  const allG = groupsOf(allCash), paidK = new Set([...allG].filter(([, l]) => isPaidSale(l)).map(([k]) => k));
+  const unpaidG = [...allG].filter(([k]) => !paidK.has(k)).map(([, l]) => l);
+  const cash = allCash.filter(r => paidK.has(gkOf(r)));
   const groups = [...groupsOf(cash).values()].sort((a, b) => String(a[0]._ctrl).localeCompare(String(b[0]._ctrl)));
   let i = 0, total = 0, kg = 0;
   const S = {cash: 0, qr: 0, cod: 0, other: 0, nCash: 0, nQR: 0, nHyb: 0, nCOD: 0, nOther: 0};
@@ -1466,12 +1479,16 @@ function ledgerHtml(date, no, editable){
       '<tr class="tot"><td>TOTAL CASH SALES</td><td class="n">' + groups.length + '</td><td class="n">' + money(total) + '</td></tr></tbody></table>' +
     '<div class="hint" style="margin-top:4px;color:#555">Paid via cash only: ' + S.nCash + ' · via QR only: ' + S.nQR + ' · Cash + QR (split): ' + S.nHyb + ' · COD: ' + S.nCOD + (S.nHyb ? ' — split transactions appear in both the cash and the QR line' : '') + '</div>' +
     (byRep ? '<div style="margin-top:8px"><b>Sales by representative:</b> ' + byRep + '</div>' : '') +
+    (unpaidG.length ? '<div class="unpaidbox"><b>NOT YET PAID — not counted in this ledger (' + unpaidG.length + '):</b> ' +
+      unpaidG.map(l => { const amt = l.reduce((a, r) => a + r._amt, 0); return '<span class="up">' + esc(l[0]._ctrl || '') + ' · ' + esc(l[0].customer) + ' · ₱' + money(amt) +
+        (editable ? ' <button class="btn paidbtn" data-lpaid="' + esc(gkOf(l[0])) + '">✔ Mark paid</button>' : '') + '</span>'; }).join('') +
+      ' <span class="hint">Total ₱' + money(unpaidG.reduce((a, l) => a + l.reduce((x, r) => x + r._amt, 0), 0)) + '</span></div>' : '') +
     '<h3 class="dh">CASH DENOMINATION</h3>' +
     '<div class="dens"><div><div class="dt">Bills</div>' + den(['1,000.00', '500.00', '200.00', '100.00', '50.00', '20.00']) + '</div>' +
       '<div><div class="dt">Coins</div>' + den(['20.00', '10.00', '5.00', '1.00', '0.25']) + '</div>' +
       '<div class="dsum"><div><span>Total cash counted</span><b>₱ ______________</b></div><div><span>Cash received per ledger</span><b>₱ ' + money(cashRecv) + '</b></div><div><span>Over / (Short)</span><b>₱ ______________</b></div></div></div>' +
     '<div class="sig3"><div>Prepared by</div><div>Checked by</div><div>Received by (Cashier)</div></div>' +
-    '<div class="foot"><span>Cash sales = all sales except salary deduction and credit · the cash count is compared with cash received only (QR and COD excluded)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
+    '<div class="foot"><span>Cash sales = PAID sales except salary deduction and credit · unpaid cash sales are not counted · the cash count is compared with cash received only (QR and COD excluded)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
   '</div>';
 }
 /** Cash-ledger number: one per day, from the server (remembered on this computer for reprints). */
@@ -1814,6 +1831,11 @@ async function openLedger(){
   draw();
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + ledgerHtml(d, no, false) + '</div>'; setTimeout(() => window.print(), 50); };
+  $('ledWrap').addEventListener('click', e => {
+    const b = e.target.closest('[data-lpaid]'); if (!b) return;
+    const list = groupsOf(ROWS.filter(r => r._date === d && !isCreditSale(r))).get(b.dataset.lpaid) || [];
+    setPaid(list, true, draw);
+  });
   $('ledWrap').addEventListener('change', async e => {
     const sel = e.target.closest('[data-via]'); if (!sel) return;
     const list = groupsOf(ROWS.filter(r => r._date === d && !isCreditSale(r))).get(sel.dataset.via) || [];
@@ -1887,11 +1909,12 @@ function authHtml(rows, info){
 function openSlip(rows, info){
   if (!rows || !rows.length) return;
   const isEmp = rows[0].custCat === CAT.employee;
-  const cashSale = !isCreditSale(rows[0]);
+  const cashSale = !isCreditSale(rows[0]) && isPaidSale(rows);   // acknowledgement receipt only for PAID cash sales
+  const unpaidCash = !isCreditSale(rows[0]) && !cashSale;
   const slip = slipHtml(rows, info), auth = isEmp ? authHtml(rows, info) : '', ar = cashSale ? arHtml(rows) : '';
   const chk = (id, label, on) => '<label style="color:#fff;display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)))"><input type="checkbox" id="' + id + '" style="width:auto"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Print · Control No. ' + esc(rows[0]._ctrl || '') + '</h3>' +
-    chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) + chk('pOne', 'Slip + ATD on one paper', store('onePaper') !== '0') : '') + (cashSale ? chk('pAR', 'Acknowledgement receipt', true) : '') +
+    chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) + chk('pOne', 'Slip + ATD on one paper', store('onePaper') !== '0') : '') + (cashSale ? chk('pAR', 'Acknowledgement receipt', true) : '') + (unpaidCash ? '<span style="color:#ffb4b4;font-weight:700" title="Mark the sale as paid to print the acknowledgement receipt">✖ Not paid — no receipt</span>' : '') +
     '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap">' + slip + auth + (ar ? '<div style="height:16px"></div>' + ar : '') + '</div></div></div>';
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
@@ -1912,6 +1935,27 @@ function openSlip(rows, info){
     $('printArea').innerHTML = pages.map(h => typeof h === 'string' ? '<div class="slip-page">' + h + '</div>' : '<div class="slip-page ' + h.cls + '" style="zoom:' + (rows.length <= 6 ? .92 : rows.length <= 10 ? .8 : rows.length <= 16 ? .68 : .58) + '">' + h.html + '</div>').join('');
     setTimeout(() => window.print(), 50);
   };
+}
+
+/** Mark a cash sale as paid (PAYMENT = AMOUNT) or not paid (PAYMENT blank). Shows at once, saves in the background. */
+let PAID_Q = Promise.resolve();
+async function setPaid(list, paid, after){
+  if (!list.length) return;
+  const vals = r => paid ? {payment: r._amt, balance: 0, payStatus: 'PAID'} : {payment: '', balance: r._amt, payStatus: 'UNPAID'};
+  const apply = r => { const v = vals(r); r.payment = v.payment; r.balance = v.balance; r.payStatus = v.payStatus; enrich(r); };
+  const who = list[0]._ctrl || list[0].customer;
+  if (list[0]._pending){
+    const sale = OUTBOX.find(x => x.uid === list[0]._uid);
+    if (sale){ sale.rows.forEach(x => { x.payment = paid ? x.amount : 0; x.balance = paid ? 0 : x.amount; x.payStatus = paid ? 'PAID' : 'UNPAID'; }); await saveOutbox(); }
+    list.forEach(apply); renderDay(); if (after) after(); toast(who + (paid ? ' marked PAID ✓' : ' marked NOT paid')); return;
+  }
+  if (needOnline('Changing the payment')) return;
+  const before = list.map(r => ({r, payment: r.payment, balance: r.balance, payStatus: r.payStatus}));
+  const payload = list.map(r => ({row: r._row, check: {customer: r.customer, particulars: r.particulars}, changes: vals(r)}));
+  list.forEach(apply); renderDay(); if (after) after();
+  PAID_Q = PAID_Q.then(() => api('updateRows', payload))
+    .then(() => toast(who + (paid ? ' marked PAID · saved to the sheet ✓' : ' marked NOT paid · saved to the sheet')))
+    .catch(err => { before.forEach(b => { b.r.payment = b.payment; b.r.balance = b.balance; b.r.payStatus = b.payStatus; enrich(b.r); }); renderDay(); if (after) after(); toast('Could not save the payment for ' + who + ': ' + (err.message || err), true); });
 }
 
 /* ================= DAY PANEL ================= */
@@ -1936,7 +1980,7 @@ function renderDay(){
     const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0), open = DAY_OPEN.has(gk), g = 'g' + (gi++);
     const badge = r0.custCat === CAT.employee ? '<span class="badge b-EMP">EMP ' + esc(companyOf(r0)) + '</span>' : '<span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span>';
     h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (isQR(r0.mode) ? ' <span class="badge b-QR">QR</span>' : isHyb(r0.mode) ? ' <span class="badge b-QR">CASH+QR</span>' : isCOD(r0.mode) ? ' <span class="badge b-COD">COD</span>' : '') + (r0._pending ? (ONLINE ? ' <span class="pend" title="Saved — being uploaded to the Google Sheet">⏳ uploading…</span>' : ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>') : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
-      '<td style="text-align:right"><button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
+      '<td style="text-align:right;white-space:nowrap">' + (!isCreditSale(r0) ? (isPaidSale(list) ? '<span class="badge b-PAID" title="Paid — click to undo" data-paid="0" data-gk2="' + esc(gk) + '" style="cursor:pointer">PAID</span> ' : '<button class="btn paidbtn" data-paid="1" data-gk2="' + esc(gk) + '" title="Cash received — mark this sale as paid">✔ Mark paid</button> ') : '') + '<button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
     h += list.map(r => '<tr class="ln ' + g + (open ? '' : ' hidden') + '"><td style="padding-left:calc(18px * var(--fs) + 14px)">' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
       '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
   });
@@ -2027,6 +2071,9 @@ function renderSummary(){
 /* ---------- daily Cash vs Credit / Salary-deduct analysis ---------- */
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // Credit/Salary deduct = any salary-deduction customer OR a credit mode of payment; everything else = Cash
+/** Cash sale fully paid? (PAYMENT ≥ AMOUNT, i.e. no balance) */
+const isPaidRow = r => !isCreditSale(r) && (num(r.payment) >= r._amt - 0.005 || (isBlank(r.payment) && /^PAID/i.test(String(r.payStatus || ''))));
+const isPaidSale = list => list.every(isPaidRow);
 const isCreditSale = r => r.custCat === CAT.employee || /SALARY|DEDUC|EMPLOYEE/i.test(r.custCat) || isCredit(r.mode) || /SALARY|DEDUC/i.test(r.mode);
 let DAILY = [];
 function renderDaily(v, f){
@@ -2376,6 +2423,8 @@ $('eVerify').addEventListener('change', () => {
   onCustomer(true);
 });
 $('eMode').addEventListener('change', () => { syncTerms(); recalc(); });
+$('ePaid').checked = store('paidDefault') !== '0';
+$('ePaid').addEventListener('change', () => { store('paidDefault', $('ePaid').checked ? '1' : '0'); recalc(); });
 $('ePayVia').addEventListener('change', () => { syncSplit(); if ($('ePayVia').value === 'HYB') $('eQRAmt').focus(); });
 $('eQRAmt').addEventListener('input', syncSplit);
 $('eDate').addEventListener('change', () => { $('dDate').value = $('eDate').value; renderDay(); onCustomer(true); });
@@ -2414,6 +2463,10 @@ $('dayTable').addEventListener('click', e => {
     head.querySelector('.caret').textContent = open ? '▾' : '▸';
     return;
   }
+  const pd = e.target.closest('[data-paid]');
+  if (pd){ const g = groupsOf(ROWS.filter(r => r._date === $('dDate').value)).get(pd.dataset.gk2); if (!g) return;
+    if (pd.dataset.paid === '0' && !confirm('Mark ' + (g[0]._ctrl || g[0].customer) + ' as NOT paid?')) return;
+    setPaid(g, pd.dataset.paid === '1'); return; }
   const p = e.target.closest('[data-print]');
   if (p){ const g = groupsOf(ROWS.filter(r => r._date === $('dDate').value)).get(p.dataset.print); if (g) openSlip(g); return; }
   const b = e.target.closest('[data-edit],[data-del]'); if (!b) return;
