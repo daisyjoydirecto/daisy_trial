@@ -81,6 +81,7 @@
   .qrrow.hidden{display:none}
   .qrrow select,.qrrow input{flex:1;min-width:0}
   #eSplitInfo{margin-top:4px}
+  .badge.b-COD{background:#fff1e0;color:#a35400;border-color:#f3c48c}
   .badge.b-QR{background:#e8f0ff;color:#1f4fa8;border-color:#b9cdf5}
   .frow .s2{grid-column:span 2}.frow .s4{grid-column:1/-1}
   @media(max-width:760px){.frow{grid-template-columns:1fr 1fr}.frow .s2{grid-column:1/-1}}
@@ -244,8 +245,11 @@
   .ledger .via.v-QR{border-color:#1f4fa8;color:#1f4fa8}
   .ledger .viaedit{display:inline-flex!important;align-items:center;gap:4px;margin:0!important;padding:1px 6px;border:1px dashed #1f4fa8;border-radius:3px;font-size:10px;font-weight:700;color:#1f4fa8;cursor:pointer;text-transform:none!important;letter-spacing:0!important;background:#f4f8ff}
   .ledger .viaedit input{width:auto;margin:0}
+  table.limtab td{white-space:nowrap}
+  table.limtab input{width:110px;display:inline-block;margin-right:4px}
   .ledger select.viasel{width:auto;padding:1px 4px;font-size:10.5px;font-weight:700;border:1px dashed #1f4fa8;color:#1f4fa8;background:#f4f8ff;border-radius:3px}
   .ledger select.viasel.on{background:#1f4fa8;color:#fff;border-style:solid}
+  .ledger .via.v-COD{border-color:#a35400;color:#a35400}
   .ledger .via.v-CASHQR{border-color:#1f4fa8;color:#1f4fa8}
   .ledger .viaedit.on{background:#1f4fa8;color:#fff;border-style:solid}
   .ledger .dh{font-size:12px;letter-spacing:.12em;margin:16px 0 6px}
@@ -337,7 +341,7 @@
             <input id="eCust" list="dl-customers" placeholder="Type or pick a name" autocomplete="off">
             <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span><span class="hint" id="eCatWhy"></span></div></div>
           <div><label>Mode of payment</label><select id="eMode"></select>
-            <div class="qrrow" id="eQRBox"><select id="ePayVia" title="How the customer paid"><option value="CASH">Paid via cash</option><option value="QR">📱 Paid via QR</option><option value="HYB">Cash + QR (split)</option></select>
+            <div class="qrrow" id="eQRBox"><select id="ePayVia" title="How the customer paid"><option value="CASH">Paid via cash</option><option value="QR">📱 Paid via QR</option><option value="HYB">Cash + QR (split)</option><option value="COD">🚚 COD (cash on delivery)</option></select>
               <input id="eQRAmt" class="hidden" type="number" min="0" step="any" placeholder="QR amount ₱"></div>
             <div class="hint hidden" id="eSplitInfo"></div></div>
           <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
@@ -454,11 +458,13 @@ const COMPANIES = ['MMEI','MMDC','MMHI','MMHC','MMFI','MGT'];   // employee sub-
 const CASH_MODE = 'CASH :  OFFICE CASHIER';
 const CREDIT_MODE = 'CREDIT';
 const QR_MODE = 'CASH : QR';          // whole sale paid via QR
+const COD_MODE = 'CASH : COD';        // cash on delivery — collected on delivery, kept separate from cash on hand
 const HYB_MODE = 'CASH : CASH + QR';  // part cash, part QR — the QR part is kept at the start of REMARKS as [QR 500.00]
 const isHyb = m => /CASH\s*\+\s*QR/i.test(m || '');
 const isQR = m => !isHyb(m) && /\bQR\b/i.test(m || '');
-/** How a cash sale was received: Cash (on hand) · QR · Cash + QR · Online/Bank */
-const payVia = r => isHyb(r.mode) ? 'Cash + QR' : isQR(r.mode) ? 'QR' : /ONLINE|BANK|DEP/i.test(r.mode || '') ? 'Online/Bank' : 'Cash';
+const isCOD = m => /\bCOD\b|ON\s*DELIVERY/i.test(m || '');
+/** How a cash sale was received: Cash (on hand) · QR · Cash + QR · COD · Online/Bank */
+const payVia = r => isHyb(r.mode) ? 'Cash + QR' : isQR(r.mode) ? 'QR' : isCOD(r.mode) ? 'COD' : /ONLINE|BANK|DEP/i.test(r.mode || '') ? 'Online/Bank' : 'Cash';
 const QR_TAG = /^\[QR\s*₱?\s*([\d,]+(?:\.\d+)?)\]\s*\|?\s*/i;
 const qrTagOf = remarks => { const m = QR_TAG.exec(String(remarks || '')); return m ? num(m[1]) : 0; };
 const stripQrTag = remarks => String(remarks || '').replace(QR_TAG, '');
@@ -466,6 +472,7 @@ const stripQrTag = remarks => String(remarks || '').replace(QR_TAG, '');
 function splitOf(list){
   const total = r2(list.reduce((a, r) => a + r._amt, 0)), via = payVia(list[0]);
   if (via === 'QR') return {via, total, cash: 0, qr: total, other: 0};
+  if (via === 'COD') return {via, total, cash: 0, qr: 0, cod: total, other: 0};
   if (via === 'Online/Bank') return {via, total, cash: 0, qr: 0, other: total};
   if (via === 'Cash + QR'){ const t = list.map(r => qrTagOf(r.remarks)).find(x => x > 0) || 0; const qr = Math.min(t, total); return {via, total, cash: r2(total - qr), qr, other: 0}; }
   return {via, total, cash: total, qr: 0, other: 0};
@@ -555,7 +562,7 @@ async function showSaved(){
     const c = await IDB.get('cache'); if (!c || !c.d) return;
     if (c.lists) applyLists(c.lists);
     const d = c.d;
-    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}}, d.config.sdRules); }
     ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); })).concat(pendingRows());
     DATA_SINCE = d.since || ''; CACHE_AT = c.at;
     if (d.url){ $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden'); }
@@ -618,7 +625,7 @@ function buildIndex(){
   $('eBU').innerHTML = COMPANIES.map(c => '<option>' + c + '</option>').join('');
   $('dl-products').innerHTML = LISTS.rates.map(o => '<option value="' + esc(o.particulars) + '">' + esc(o.prodCat || '') + '</option>').join('');
   $('dl-prodCats').innerHTML = LISTS.prodCats.map(o => '<option value="' + esc(o.name) + '">').join('');
-  const modes = new Set([CASH_MODE, QR_MODE, HYB_MODE, CREDIT_MODE, 'CASH : ONLINE/BANK DEP']); ROWS.forEach(r => r.mode && modes.add(r.mode));
+  const modes = new Set([CASH_MODE, QR_MODE, HYB_MODE, COD_MODE, CREDIT_MODE, 'CASH : ONLINE/BANK DEP']); ROWS.forEach(r => r.mode && modes.add(r.mode));
   $('dl-mode').innerHTML = [...modes].map(m => '<option value="' + esc(m) + '">').join('');
   const sel = $('eRep'), cur = sel.value || store('rep') || '';
   sel.innerHTML = '<option value="">— select —</option>' + LISTS.reps.map(o => '<option>' + esc(o.name) + '</option>').join('');
@@ -633,6 +640,52 @@ function setCustList(){
 /** Regular = has a Date of Regularization on or before the sale date. */
 function isRegular(emp, onDate){ const r = toISO(emp && emp.regular); return /^\d{4}-\d{2}-\d{2}$/.test(r) && r <= (onDate || todayISO()); }
 function verifyOn(){ return settings().verifyEmp !== false; }
+/* ---------- salary deduction credit limit per cut-off ---------- */
+let SD_RULES = {limit: 0, cut: [15, 31], limits: {}};   // shared by all users (kept on the server, changed in ⚙ Settings)
+const dim = (y, m) => new Date(y, m + 1, 0).getDate();   // days in month (m = 0-11)
+/** Cut-off period that contains the date: {from, to, label}. cut = cut-off days, e.g. [15,31] → 1–15 and 16–end of month. */
+function cutoffOf(iso){
+  const [y, m, d] = iso.split('-').map(Number), ends = [];
+  for (let k = -2; k <= 2; k++){
+    const dt = new Date(y, m - 1 + k, 1), yy = dt.getFullYear(), mm = dt.getMonth();
+    (SD_RULES.cut && SD_RULES.cut.length ? SD_RULES.cut : [15, 31]).forEach(c => ends.push(isoOf(new Date(yy, mm, Math.min(c, dim(yy, mm))))));
+  }
+  ends.sort();
+  const to = ends.find(e => e >= iso), prev = ends.filter(e => e < iso).pop();
+  const from = addDays(prev, 1);
+  return {from, to, label: fmtDate(from).replace(/ \d{4}$/, '') + ' – ' + fmtDate(to)};
+}
+/** Salary deduction already used by this employee in the cut-off period of the date (sheet + not-yet-uploaded sales). */
+function creditUsed(emp, iso){
+  const p = cutoffOf(iso);
+  let used = 0;
+  ROWS.forEach(r => {
+    if (!r._date || r._date < p.from || r._date > p.to) return;
+    if (!(r.custCat === CAT.employee || /SALARY|DEDUC/i.test(r.custCat))) return;
+    const m = /EMP#\s*([^\s·|]+)/.exec(r.remarks || '');
+    const same = (emp.empNo && m && key(m[1]) === key(emp.empNo)) || findEmployee(r.customer) === emp;
+    if (same) used += r._amt;
+  });
+  return {used: r2(used), period: p};
+}
+/** Payroll groups found in the uploaded employee lists: [{k, label}] */
+function payrollGroups(){
+  const m = new Map();
+  COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { const k = key(e.payroll) || 'BLANK'; if (!m.has(k)) m.set(k, String(e.payroll || '').trim() || '(no payroll group)'); }));
+  return [...m].map(([k, label]) => ({k, label})).sort((a, b) => a.label.localeCompare(b.label));
+}
+/** Limit for this employee: business unit + payroll group, else the default. 0 = no limit. */
+function limitFor(emp){
+  const k = (emp.company || '') + '|' + (key(emp.payroll) || 'BLANK'), L = SD_RULES.limits || {};
+  return L[k] !== undefined && L[k] !== '' ? num(L[k]) : num(SD_RULES.limit);
+}
+function creditInfo(emp, iso){
+  if (!emp || !iso) return null;
+  const limit = limitFor(emp);
+  if (!(limit > 0)) return null;
+  const u = creditUsed(emp, iso);
+  return {used: u.used, limit, left: r2(Math.max(0, limit - u.used)), period: u.period, reached: u.used >= limit - 0.005};
+}
 function findEmployee(name){
   const v = nameVariants(name);
   for (const k of v.exact) if (IDX.empExact.has(k)) return IDX.empExact.get(k);
@@ -764,7 +817,7 @@ async function load(silent, fresh){
       d = c.d; fromCache = true; CACHE_AT = c.at;
       if (!LISTS.rates.length && c.lists) applyLists(c.lists);
     }
-    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}}, d.config.sdRules); }
     ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); }), !fromCache);
     $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden');
     $('connectBox').classList.add('hidden');
@@ -842,7 +895,13 @@ function onCustomer(keepMode){
   else if (!e.emp){ badge = '✖ NOT IN EMPLOYEES LIST'; cls = 'b-NO'; why = 'Salary deduction is only for employees in the list'; }
   else if (!e.regular){ badge = (V ? '✖ NOT YET REGULAR · ' : 'NOT REGULAR · ') + e.emp.company; cls = V ? 'b-NO' : 'b-EMP';
     why = 'Emp# ' + (e.emp.empNo || '—') + ' · ' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization'); }
-  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular)); }
+  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular));
+    const ci = creditInfo(e.emp, $('eDate').value);
+    if (ci){
+      why += ' · ' + (e.emp.payroll || 'no payroll group') + ' limit · Credit ' + ci.period.label + ': used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' · ' + peso(ci.left) + ' left';
+      if (ci.reached){ badge = '✖ CREDIT LIMIT REACHED · ' + e.emp.company; cls = 'b-NO'; }
+    }
+  }
   $('eCatBadge').textContent = badge; $('eCatBadge').className = 'badge ' + cls; $('eCatWhy').textContent = why;
   $('eVerifyBar').classList.toggle('hidden', c !== 'E');
   if (c === 'E') $('eCust').placeholder = V ? 'Employee name (must be in the Employees list)' : 'Employee name';
@@ -923,7 +982,7 @@ function recalc(){
   $('tPaid').textContent = isCredit($('eMode').value) ? (effective().cat === CAT.employee ? 'Salary deduction' : 'Charged (unpaid)') : 'Paid in full';
 }
 function buildRows(){
-  const date = $('eDate').value, e = effective(), mode0 = $('eMode').value.trim(), via = !isCredit(mode0) && e.cat !== CAT.employee ? $('ePayVia').value : 'CASH', mode = via === 'QR' ? QR_MODE : via === 'HYB' ? HYB_MODE : mode0, terms = $('eTermsBox').classList.contains('hidden') ? (e.cat === CAT.employee ? '0' : '') : $('eTerms').value.trim();
+  const date = $('eDate').value, e = effective(), mode0 = $('eMode').value.trim(), via = !isCredit(mode0) && e.cat !== CAT.employee ? $('ePayVia').value : 'CASH', mode = via === 'QR' ? QR_MODE : via === 'COD' ? COD_MODE : via === 'HYB' ? HYB_MODE : mode0, terms = $('eTermsBox').classList.contains('hidden') ? (e.cat === CAT.employee ? '0' : '') : $('eTerms').value.trim();
   const today = todayISO(), credit = isCredit(mode), due = credit ? addDays(date, num(terms)) : '';
   const lines = [...$('lineBody').querySelectorAll('tr')].map(lineValues).filter(v => v.particulars || v.weight || v.amount);
   const errs = [];
@@ -934,6 +993,11 @@ function buildRows(){
     else if (verifyOn() && !e.regular) errs.push('salary deduction is only for REGULAR employees (' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization') + ')');
     else if (!e.company) errs.push('business unit');
     if (!verifyOn() && !e.empNo) errs.push('ID # for the Authority to Deduct');
+    if (verifyOn() && e.emp && e.regular){
+      const ci = creditInfo(e.emp, date), tot = lines.reduce((a, v) => a + v.amount, 0);
+      if (ci && r2(ci.used + tot) > ci.limit + 0.005)
+        errs.push('credit limit — ' + e.emp.name + ' has used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' for the ' + ci.period.label + ' cut-off; only ' + peso(ci.left) + ' left (this sale is ' + peso(tot) + ')');
+    }
   }
   if (!lines.length) errs.push('at least one product line');
   if (via === 'HYB'){ const tot = lines.reduce((a, v) => a + v.amount, 0), q = num($('eQRAmt').value);
@@ -1048,7 +1112,7 @@ function slipHtml(rows, info){
     return '<tr><td class="c">' + (i + 1) + '</td><td>' + desc + '</td><td class="c">' + (perHead ? qty : kgf(qty)) + '</td><td class="c">' + units + '</td><td class="n">' + money(rate) + '</td><td class="n">' + money(r._amt) + '</td></tr>';
   }).join('');
   const total = rows.reduce((a, r) => a + r._amt, 0), kg = rows.reduce((a, r) => a + r._kg, 0);
-  const payOpt = isCredit(r0.mode) ? (isEmp ? 'SALARY DEDUCTION' : 'CREDIT') : (isQR(r0.mode) ? 'CASH (via QR)' : isHyb(r0.mode) ? (() => { const sp = splitOf(rows); return 'CASH ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr); })() : /CASH/i.test(r0.mode) ? 'CASH' : esc(r0.mode));
+  const payOpt = isCredit(r0.mode) ? (isEmp ? 'SALARY DEDUCTION' : 'CREDIT') : (isQR(r0.mode) ? 'CASH (via QR)' : isCOD(r0.mode) ? 'COD (cash on delivery)' : isHyb(r0.mode) ? (() => { const sp = splitOf(rows); return 'CASH ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr); })() : /CASH/i.test(r0.mode) ? 'CASH' : esc(r0.mode));
   const catTxt = isEmp ? 'EMPLOYEE — ' + esc(company || '') : esc(r0.custCat);
   const userRemarks = stripQrTag(String(r0.remarks || '').replace(/^\[[A-Z]+\][^|]*\|?\s*/, ''));
   const L = (a, b) => '<div><span>' + a + '</span><span>' + (b || '&nbsp;') + '</span></div>';
@@ -1099,7 +1163,7 @@ function arHtml(rows){
   const pre = arPre(s);
   const docs = [r0.dr ? 'DR# ' + r0.dr : '', r0.inhouseDr ? 'IDR# ' + r0.inhouseDr : ''].filter(Boolean).join(' · ');
   const items = rows.map(r => r.particulars + (r._kg ? ' ' + kgf(r._kg) + 'kg' : '')).join(', ');
-  const forTxt = 'Meat/Livestock purchase' + (ctrl ? ' · Ctrl# ' + ctrl : '') + (docs ? ' · ' + docs : '') + (isQR(r0.mode) ? ' · paid via QR' : isHyb(r0.mode) ? (() => { const sp = splitOf(rows); return ' · paid Cash ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr); })() : '') + ' — ' + items;
+  const forTxt = 'Meat/Livestock purchase' + (ctrl ? ' · Ctrl# ' + ctrl : '') + (docs ? ' · ' + docs : '') + (isQR(r0.mode) ? ' · paid via QR' : isCOD(r0.mode) ? ' · COD (cash on delivery)' : isHyb(r0.mode) ? (() => { const sp = splitOf(rows); return ' · paid Cash ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr); })() : '') + ' — ' + items;
   const F = (label, val, cls) => '<div class="ln"><span>' + label + '</span><span class="f' + (cls ? ' ' + cls : '') + '">' + (val || '&nbsp;') + '</span></div>';
   return '<div class="ar">' +
     '<div class="ah"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""><div class="co"><b>' + esc(s.company.replace(/\s+INC\.?$/i, ', INC.')) + '</b><span>' + esc(s.address) + '</span></div><div></div></div>' +
@@ -1122,24 +1186,26 @@ function ledgerHtml(date, no, editable){
   const cash = ROWS.filter(r => r._date === date && !isCreditSale(r));
   const groups = [...groupsOf(cash).values()].sort((a, b) => String(a[0]._ctrl).localeCompare(String(b[0]._ctrl)));
   let i = 0, total = 0, kg = 0;
-  const S = {cash: 0, qr: 0, other: 0, nCash: 0, nQR: 0, nHyb: 0, nOther: 0};
+  const S = {cash: 0, qr: 0, cod: 0, other: 0, nCash: 0, nQR: 0, nHyb: 0, nCOD: 0, nOther: 0};
   const body = groups.map(list => {
     const r0 = list[0], amt = list.reduce((a, r) => a + r._amt, 0), k = list.reduce((a, r) => a + r._kg, 0);
     total += amt; kg += k; i++;
     const sp = splitOf(list);
-    S.cash += sp.cash; S.qr += sp.qr; S.other += sp.other;
-    if (sp.via === 'Cash') S.nCash++; else if (sp.via === 'QR') S.nQR++; else if (sp.via === 'Cash + QR') S.nHyb++; else S.nOther++;
+    S.cash += sp.cash; S.qr += sp.qr; S.cod += sp.cod || 0; S.other += sp.other;
+    if (sp.via === 'Cash') S.nCash++; else if (sp.via === 'QR') S.nQR++; else if (sp.via === 'Cash + QR') S.nHyb++; else if (sp.via === 'COD') S.nCOD++; else S.nOther++;
     const viaTxt = sp.via === 'Cash + QR' ? 'Cash ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr) : sp.via;
     const docs = [r0.dr ? 'DR ' + r0.dr : '', r0.inhouseDr ? 'IDR ' + r0.inhouseDr : ''].filter(Boolean).join(' / ');
     const lines = list.map((r, j) => '<tr class="li">' +
       (j === 0 ? '<td>' + i + '</td><td>' + esc(r0._ctrl || '') + (r0._pending ? ' ⏳' : '') + '</td><td>' + esc(docs) + '</td><td><b>' + esc(r0.customer) + '</b><br><span style="color:#666">' + esc(r0.custCat) + ' · ' + esc(r0.rep) + '</span></td><td>' + (editable && sp.via !== 'Online/Bank'
-        ? '<select class="viasel' + (sp.via !== 'Cash' ? ' on' : '') + '" data-via="' + esc(gkOf(r0)) + '">' + [['CASH','Cash'],['QR','QR'],['HYB','Cash + QR']].map(([v, l]) => '<option value="' + v + '"' + ((v === 'CASH' && sp.via === 'Cash') || (v === 'QR' && sp.via === 'QR') || (v === 'HYB' && sp.via === 'Cash + QR') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>'
+        ? '<select class="viasel' + (sp.via !== 'Cash' ? ' on' : '') + '" data-via="' + esc(gkOf(r0)) + '">' + [['CASH','Cash'],['QR','QR'],['HYB','Cash + QR'],['COD','COD']].map(([v, l]) => '<option value="' + v + '"' + ((v === 'CASH' && sp.via === 'Cash') || (v === 'QR' && sp.via === 'QR') || (v === 'HYB' && sp.via === 'Cash + QR') || (v === 'COD' && sp.via === 'COD') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>'
         : '<span class="via v-' + key(sp.via) + '">' + esc(sp.via) + '</span>') + '</td>'
                : '<td></td><td></td><td></td><td></td><td></td>') +
       '<td>' + esc(r.particulars) + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + money(r._rate) + '</td><td class="n">' + money(r._amt) + '</td></tr>').join('');
     return lines + '<tr class="st"><td colspan="6" style="text-align:right">Total · ' + esc(r0._ctrl || r0.customer) + ' (' + esc(viaTxt) + ')</td><td class="n">' + kgf(k) + '</td><td></td><td class="n">' + money(amt) + '</td></tr>';
   }).join('');
-  const VIA = [{v: 'Cash', n: S.nCash + S.nHyb, amt: S.cash}, {v: 'QR', n: S.nQR + S.nHyb, amt: S.qr}, {v: 'Online/Bank', n: S.nOther, amt: S.other}].filter(x => x.v !== 'Online/Bank' || x.n);
+  const VIA = [{v: 'Cash', n: S.nCash + S.nHyb, amt: S.cash}, {v: 'QR', n: S.nQR + S.nHyb, amt: S.qr}, {v: 'COD', n: S.nCOD, amt: S.cod}, {v: 'Online/Bank', n: S.nOther, amt: S.other}].filter(x => x.v !== 'Online/Bank' || x.n);
+  const VIA_BOX = {Cash: 'Cash received', QR: 'Received via QR', COD: 'COD (cash on delivery)', 'Online/Bank': 'Online / bank'};
+  const VIA_ROW = {Cash: 'Cash received (cash on hand)', QR: 'Received via QR', COD: 'COD — cash on delivery (to be remitted)', 'Online/Bank': 'Online / bank deposit'};
   const cashRecv = S.cash;
   const byRep = [...sumBy(cash, r => r.rep, r => r._amt)].sort((a, b) => b[1] - a[1]).map(([k, v]) => esc(k) + ': ₱' + money(v)).join(' · ');
   const pend = cash.some(r => r._pending);
@@ -1151,21 +1217,21 @@ function ledgerHtml(date, no, editable){
     '<div class="lno">Control No.: <b>' + esc(no || '—') + '</b></div>' +
     '<h2>DAILY CASH LEDGER</h2><div class="sub"><b>' + esc(longDate(date)) + '</b> (' + DAYS[dn.getDay()] + ') · Sales Meat &amp; Livestock' + (pend ? ' · ⏳ includes sales not yet uploaded to the sheet' : '') + '</div>' +
     '<div class="boxes" style="grid-template-columns:repeat(' + (VIA.length + 1) + ',1fr)"><div><span>Total cash sales</span><b>₱' + money(total) + '</b> <span style="display:inline;text-transform:none;letter-spacing:0">(' + groups.length + ' trans. · ' + kgf(kg) + ' kg)</span></div>' +
-      VIA.map(x => '<div><span>' + (x.v === 'Cash' ? 'Cash received' : x.v === 'QR' ? 'Received via QR' : 'Online / bank') + '</span><b>₱' + money(x.amt) + '</b> <span style="display:inline;text-transform:none;letter-spacing:0">(' + x.n + ')</span></div>').join('') + '</div>' +
+      VIA.map(x => '<div><span>' + VIA_BOX[x.v] + '</span><b>₱' + money(x.amt) + '</b> <span style="display:inline;text-transform:none;letter-spacing:0">(' + x.n + ')</span></div>').join('') + '</div>' +
     '<table><thead><tr><th style="width:24px">#</th><th style="width:66px">Control No.</th><th style="width:84px">DR / IDR</th><th>Customer</th><th style="width:86px">Paid via</th><th>Particulars</th><th class="n" style="width:54px">Kg</th><th class="n" style="width:64px">Rate</th><th class="n" style="width:84px">Amount (₱)</th></tr></thead><tbody>' +
       (body || '<tr><td colspan="9" style="text-align:center;padding:14px;color:#777">No cash sales on this day.</td></tr>') +
       '<tr class="tot"><td colspan="6" style="text-align:right">TOTAL CASH SALES</td><td class="n">' + kgf(kg) + '</td><td></td><td class="n">' + money(total) + '</td></tr></tbody></table>' +
     '<table class="brk"><thead><tr><th>Payment breakdown</th><th class="n">Transactions</th><th class="n">Amount (₱)</th></tr></thead><tbody>' +
-      VIA.map(x => '<tr><td>' + (x.v === 'Cash' ? 'Cash received (cash on hand)' : x.v === 'QR' ? 'Received via QR' : 'Online / bank deposit') + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>').join('') +
+      VIA.map(x => '<tr><td>' + VIA_ROW[x.v] + '</td><td class="n">' + x.n + '</td><td class="n">' + money(x.amt) + '</td></tr>').join('') +
       '<tr class="tot"><td>TOTAL CASH SALES</td><td class="n">' + groups.length + '</td><td class="n">' + money(total) + '</td></tr></tbody></table>' +
-    '<div class="hint" style="margin-top:4px;color:#555">Paid via cash only: ' + S.nCash + ' · via QR only: ' + S.nQR + ' · Cash + QR (split): ' + S.nHyb + (S.nHyb ? ' — split transactions appear in both the cash and the QR line' : '') + '</div>' +
+    '<div class="hint" style="margin-top:4px;color:#555">Paid via cash only: ' + S.nCash + ' · via QR only: ' + S.nQR + ' · Cash + QR (split): ' + S.nHyb + ' · COD: ' + S.nCOD + (S.nHyb ? ' — split transactions appear in both the cash and the QR line' : '') + '</div>' +
     (byRep ? '<div style="margin-top:8px"><b>Sales by representative:</b> ' + byRep + '</div>' : '') +
     '<h3 class="dh">CASH DENOMINATION</h3>' +
     '<div class="dens"><div><div class="dt">Bills</div>' + den(['1,000.00', '500.00', '200.00', '100.00', '50.00', '20.00']) + '</div>' +
       '<div><div class="dt">Coins</div>' + den(['20.00', '10.00', '5.00', '1.00', '0.25']) + '</div>' +
       '<div class="dsum"><div><span>Total cash counted</span><b>₱ ______________</b></div><div><span>Cash received per ledger</span><b>₱ ' + money(cashRecv) + '</b></div><div><span>Over / (Short)</span><b>₱ ______________</b></div></div></div>' +
     '<div class="sig3"><div>Prepared by</div><div>Checked by</div><div>Received by (Cashier)</div></div>' +
-    '<div class="foot"><span>Cash sales = all sales except salary deduction and credit · the cash count is compared with cash received only (QR excluded)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
+    '<div class="foot"><span>Cash sales = all sales except salary deduction and credit · the cash count is compared with cash received only (QR and COD excluded)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
   '</div>';
 }
 /** Cash-ledger number: one per day, from the server (remembered on this computer for reprints). */
@@ -1211,6 +1277,37 @@ function saveLocalCopy(){
     return IDB.set('cache', c);
   }).catch(() => {});
 }
+/* ================= CREDIT LIMITS: business unit × payroll group ================= */
+function openLimits(){
+  const groups = payrollGroups(), L = SD_RULES.limits || {};
+  if (!groups.length) return toast('Upload the employee lists first — the payroll groups are taken from them.', true);
+  const def = num(SD_RULES.limit);
+  const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => (key(e.payroll) || 'BLANK') === g).length;
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
+    '<p class="hint" style="margin-top:0">Amount each employee can avail per cut-off, by <b>business unit</b> and <b>payroll group</b>. Leave a box blank to use the default (' + (def ? peso(def) : 'no limit') + '). Type 0 for no limit. The small number is how many employees are in that group.</p>' +
+    '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
+    COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
+      const k = c + '|' + g.k, n = cnt(c, g.k);
+      return '<td><input type="number" min="0" step="any" data-lim="' + esc(k) + '" placeholder="' + (def ? money(def) : '—') + '" value="' + (L[k] !== undefined ? esc(L[k]) : '') + '"' + (n ? '' : ' style="opacity:.55"') + '><span class="hint">' + n + ' emp.</span></td>';
+    }).join('') + '</tr>').join('') +
+    '</tbody></table></div>' +
+    '<div class="toolbar" style="margin-top:10px"><span class="hint">Fill a whole column: </span>' + groups.map(g => '<button class="btn sm" data-fill="' + esc(g.k) + '">' + esc(g.label) + '</button>').join('') + '</div>' +
+    '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="limSave">Save limits for all users</button></div></div></div>';
+  $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
+  $('modalRoot').querySelectorAll('[data-fill]').forEach(b => b.onclick = () => {
+    const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = default):', ''); if (v === null) return;
+    $('modalRoot').querySelectorAll('[data-lim$="|' + b.dataset.fill + '"]').forEach(i => i.value = v.trim());
+  });
+  $('limSave').onclick = async () => {
+    if (needOnline('Saving the credit limits')) return;
+    const limits = {};
+    $('modalRoot').querySelectorAll('[data-lim]').forEach(i => { if (i.value.trim() !== '') limits[i.dataset.lim] = num(i.value); });
+    $('limSave').disabled = true;
+    try { SD_RULES = await api('saveSdRules', {limit: num(SD_RULES.limit), cut: SD_RULES.cut, limits}); $('modalRoot').innerHTML = ''; onCustomer(true); toast('Credit limits saved for all users ✓ (' + Object.keys(limits).length + ' set)'); }
+    catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
+  };
+}
+
 /* ================= TRASH BIN ================= */
 async function openTrash(){
   if (needOnline('The Trash')) return;
@@ -1256,7 +1353,7 @@ async function openLedger(){
   const no = await ledgerNo(d);
   btn.disabled = false;
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Daily cash ledger · ' + esc(fmtDate(d)) + (no ? ' · No. ' + esc(no) : '') + '</h3>' +
-    '<span class="hint" style="color:#ccc">Set <b>Paid via</b> (Cash · QR · Cash + QR) for each sale — it is saved to the sheet</span>' +
+    '<span class="hint" style="color:#ccc">Set <b>Paid via</b> (Cash · QR · Cash + QR · COD) for each sale — it is saved to the sheet</span>' +
     '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap" id="ledWrap"></div></div></div>';
   const draw = () => { $('ledWrap').innerHTML = ledgerHtml(d, no, true); };
@@ -1275,9 +1372,9 @@ async function openLedger(){
       qr = r2(num(ans));
       if (ans === null || !(qr > 0) || qr >= tot){ if (ans !== null) toast('QR amount must be more than 0 and less than ' + peso(tot) + '.', true); return draw(); }
     }
-    const mode = v === 'QR' ? QR_MODE : v === 'HYB' ? HYB_MODE : CASH_MODE;
+    const mode = v === 'QR' ? QR_MODE : v === 'COD' ? COD_MODE : v === 'HYB' ? HYB_MODE : CASH_MODE;
     const remOf = r => { const base = stripQrTag(r.remarks); return v === 'HYB' ? '[QR ' + qr.toFixed(2) + ']' + (base ? ' | ' + base : '') : base; };
-    const label = v === 'QR' ? 'paid via QR' : v === 'HYB' ? 'Cash ' + peso(r2(tot - qr)) + ' + QR ' + peso(qr) : 'paid via cash';
+    const label = v === 'QR' ? 'paid via QR' : v === 'COD' ? 'COD (cash on delivery)' : v === 'HYB' ? 'Cash ' + peso(r2(tot - qr)) + ' + QR ' + peso(qr) : 'paid via cash';
     if (list[0]._pending && UPLOADING){   // it is being uploaded right now → wait, then change the uploaded rows
       toast('Finishing the upload first…'); await UPLOADING;
       const g2 = groupsOf(ROWS.filter(r => r._date === d && !isCreditSale(r)));
@@ -1376,7 +1473,7 @@ function renderDay(){
   groupsOf(rows).forEach((list, gk) => {
     const r0 = list[0], sub = list.reduce((a, r) => a + r._amt, 0), open = DAY_OPEN.has(gk), g = 'g' + (gi++);
     const badge = r0.custCat === CAT.employee ? '<span class="badge b-EMP">EMP ' + esc(companyOf(r0)) + '</span>' : '<span class="badge b-' + key(r0.custCat) + '">' + esc(r0.custCat) + '</span>';
-    h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (isQR(r0.mode) ? ' <span class="badge b-QR">QR</span>' : isHyb(r0.mode) ? ' <span class="badge b-QR">CASH+QR</span>' : '') + (r0._pending ? (ONLINE ? ' <span class="pend" title="Saved — being uploaded to the Google Sheet">⏳ uploading…</span>' : ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>') : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
+    h += '<tr class="sub-tot grp clk" data-grp="' + g + '" data-gk="' + esc(gk) + '" title="Click to show / hide the products"><td colspan="3"><span class="caret">' + (open ? '▾' : '▸') + '</span> ' + (r0._ctrl ? '<span class="ctrl">' + esc(r0._ctrl) + '</span> · ' : '') + esc(r0.customer) + ' ' + badge + (isQR(r0.mode) ? ' <span class="badge b-QR">QR</span>' : isHyb(r0.mode) ? ' <span class="badge b-QR">CASH+QR</span>' : isCOD(r0.mode) ? ' <span class="badge b-COD">COD</span>' : '') + (r0._pending ? (ONLINE ? ' <span class="pend" title="Saved — being uploaded to the Google Sheet">⏳ uploading…</span>' : ' <span class="pend" title="Saved on this device — click Sync to upload">⏳ not synced</span>') : '') + ' <span class="hint">' + esc(r0.rep) + '</span></td><td class="n">' + peso(sub) + '</td>' +
       '<td style="text-align:right"><button class="btn print" data-print="' + esc(gk) + '" title="Print the sales slip' + (r0.custCat === CAT.employee ? ' and Authority to Deduct' : '') + '">🖨 Print' + (r0.custCat === CAT.employee ? ' + ATD' : '') + '</button></td></tr>';
     h += list.map(r => '<tr class="ln ' + g + (open ? '' : ' hidden') + '"><td style="padding-left:calc(18px * var(--fs) + 14px)">' + esc(r.particulars) + (r.heads ? ' <span class="hint">· ' + esc(r.heads) + ' hd</span>' : '') + '</td><td class="n">' + kgf(r._kg) + '</td><td class="n">' + peso(r._rate) + '</td><td class="n">' + peso(r._amt) + '</td>' +
       '<td style="white-space:nowrap"><button class="iconbtn" data-edit="' + r._row + '" title="Edit">✎</button><button class="iconbtn" data-del="' + r._row + '" title="Delete">🗑</button></td></tr>').join('');
@@ -1707,6 +1804,12 @@ function openSettings(){
       '<div><label>Access key</label><input id="stKey" type="text" autocomplete="off" value="' + esc(c.key) + '"' + (HAS_GAS ? ' disabled' : '') + '></div></div>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Salary deduction</h2>' +
     '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)));color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:14px">Salary deduction credit limit <span style="text-transform:none;letter-spacing:0;font-weight:400">— shared by all users, checked when verification is ON</span></h2><div class="fgrid">' +
+      '<div><label>Default limit per employee per cut-off (₱, 0 = no limit)</label><input id="stLimit" type="number" min="0" step="any" value="' + esc(num(SD_RULES.limit) || 0) + '"></div>' +
+      '<div><label>Cut-off periods</label><select id="stCut">' + [['15,31','1–15 and 16–end of month'],['10,25','11–25 and 26–10'],['5,20','6–20 and 21–5'],['31','Monthly (1–end of month)']]
+        .map(([v, l]) => '<option value="' + v + '"' + ((SD_RULES.cut || [15, 31]).join(',') === v ? ' selected' : '') + '>' + l + '</option>').join('') +
+        (['15,31','10,25','5,20','31'].includes((SD_RULES.cut || []).join(',')) ? '' : '<option value="' + esc((SD_RULES.cut || []).join(',')) + '" selected>Cut-off days ' + esc((SD_RULES.cut || []).join(' & ')) + '</option>') + '</select></div>' +
+      '<div class="span2"><button class="btn sm" id="stLimits" type="button">Limits per business unit &amp; payroll group…</button> <span class="hint">' + Object.keys(SD_RULES.limits || {}).length + ' set · others use the default</span></div></div>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
       '<div class="span2"><label>Company name</label><input id="stCo" value="' + esc(s.company) + '"></div>' +
       '<div class="span2"><label>Address</label><input id="stAddr" value="' + esc(s.address) + '"></div>' +
@@ -1719,6 +1822,7 @@ function openSettings(){
     '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm" id="stBackup">⬇ Download backup</button><label class="btn sm" style="margin:0;text-transform:none;font-size:max(10px, calc(12px * var(--fs)));color:var(--ink)">⬆ Restore from backup<input type="file" id="stRestore" accept=".json" class="hidden"></label></div>' +
     '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="stSave">Save settings</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
+  $('stLimits').onclick = openLimits;
   let logo = s.logo;
   $('stLogo').onchange = e => { const f = e.target.files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { logo = rd.result; $('modalRoot').querySelector('img').src = logo; }; rd.readAsDataURL(f); };
   $('stLogoReset').onclick = () => { logo = ''; $('modalRoot').querySelector('img').src = DEFAULT_LOGO; };
@@ -1731,6 +1835,11 @@ function openSettings(){
     catch (err){ toast('Restore failed: ' + err.message, true); }
   };
   $('stSave').onclick = () => {
+    const nl = num($('stLimit').value), nc = $('stCut').value.split(',').map(Number);
+    if (nl !== num(SD_RULES.limit) || nc.join(',') !== (SD_RULES.cut || []).join(',')){
+      if (!ONLINE) toast('The credit limit is shared — connect to the internet to change it.', true);
+      else api('saveSdRules', {limit: nl, cut: nc, limits: SD_RULES.limits || {}}).then(r => { SD_RULES = r; onCustomer(true); toast('Credit limits saved for all users ✓ (default ' + (r.limit ? peso(r.limit) : 'no limit') + ' per cut-off)'); }).catch(e => toast('Could not save the credit limit: ' + (e.message || e), true));
+    }
     saveSettings({company: $('stCo').value.trim() || DEFAULT_SETTINGS.company, address: $('stAddr').value.trim(), title: $('stTitle').value.trim() || DEFAULT_SETTINGS.title, arPrefix: $('stArPrefix').value.trim(), logo, verifyEmp: $('stVerify').checked});
     onCustomer(true);
     if (!HAS_GAS){ const u = $('stUrl').value.trim(), k = $('stKey').value.trim(); const changed = u !== conn().url || k !== conn().key; store('apiUrl', u); store('apiKey', k); if (changed) load(); }
