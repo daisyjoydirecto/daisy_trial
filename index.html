@@ -683,15 +683,16 @@ function setCustList(){
 /** Regular? Date of Regularization on/before the date; if there is no date, Employee Status must be "Regular". */
 function isRegular(emp, onDate){
   const r = toISO(emp && emp.regular);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return r <= (onDate || todayISO());
-  return isRegularStatus(emp && emp.status);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(r) && r <= (onDate || todayISO())) return true;   // regularized on/before the date
+  return isRegularStatus(emp && emp.status);                                          // otherwise Employee Status = Regular
 }
-function isRegularStatus(st){ st = String(st || '').toUpperCase(); return /\bREGULAR\b/.test(st) && !/IRREGULAR|NON[\s-]*REGULAR|PROBATION|NOT\s+REGULAR/.test(st); }
+function isRegularStatus(st){ st = String(st || '').toUpperCase(); return /REGULAR|PERMANENT/.test(st) && !/IRREGULAR|NON[\s-]*REGULAR|PROBATION|NOT\s*REGULAR|CONTRACT/.test(st); }
 /** Short text about regular status for messages. */
 function regText(emp){
   const r = toISO(emp && emp.regular);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return 'regular on ' + fmtDate(r);
-  return emp && emp.status ? 'no date of regularization · status: ' + emp.status : 'no date of regularization and no employee status';
+  const st = emp && emp.status ? 'status: ' + emp.status : 'no employee status';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return 'regular on ' + fmtDate(r) + ' · ' + st;
+  return 'no date of regularization · ' + st;
 }
 function verifyOn(){ return settings().verifyEmp !== false; }
 /* ---------- salary deduction credit limit per cut-off ---------- */
@@ -1027,7 +1028,7 @@ function onCustomer(keepMode){
   else if (!e.emp){ badge = '✖ NOT IN EMPLOYEES LIST'; cls = 'b-NO'; why = 'Salary deduction is only for employees in the list'; }
   else if (!e.regular){ badge = (V ? '✖ NOT YET REGULAR · ' : 'NOT REGULAR · ') + e.emp.company; cls = V ? 'b-NO' : 'b-EMP';
     why = 'Emp# ' + (e.emp.empNo || '—') + ' · ' + regText(e.emp); }
-  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + (/^\d{4}-\d{2}-\d{2}$/.test(toISO(e.emp.regular)) ? ' · regular since ' + fmtDate(toISO(e.emp.regular)) : ' · status: ' + (e.emp.status || 'Regular'));
+  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + (/^\d{4}-\d{2}-\d{2}$/.test(toISO(e.emp.regular)) && toISO(e.emp.regular) <= $('eDate').value ? ' · regular since ' + fmtDate(toISO(e.emp.regular)) : ' · status: ' + (e.emp.status || 'Regular'));
     const ci = creditInfo(e.emp, $('eDate').value);
     if (ci){
       why += ' · ' + payGroupLabel(payGroup(e.emp.payroll)) + ' limit ' + peso(ci.base) + (ci.carried > 0 ? ' − carried over-limit balance ' + peso(ci.carried) + ' = ' + peso(ci.limit) : '') + ' · Credit ' + ci.period.label + ': used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' · ' + peso(ci.left) + ' left';
@@ -2138,6 +2139,10 @@ async function uploadEmployees(file, company){
   const summary = Object.keys(groups).map(c => c + ': ' + groups[c].length + ' (was ' + (LISTS.employees[c] || []).length + ')').join('\n');
   if (!confirm('Replace employee list?\n\n' + summary)) return null;
   applyLists(await api('saveEmployees', groups)); buildIndex(); onCustomer(true);
+  const sent = Object.keys(groups).some(c => groups[c].some(e => e.status));
+  const kept = Object.keys(groups).some(c => (LISTS.employees[c] || []).some(e => e.status));
+  if (sent && !kept) toast('Employee Status was NOT saved — please deploy the latest Code.gs (v22 or newer) as a New version, then upload this list again.', true);
+  else if (!sent) toast('Note: this file has no Employee Status column — only the Date of Regularization is used.', true);
   return Object.keys(groups);
 }
 
