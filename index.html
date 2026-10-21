@@ -1364,7 +1364,7 @@ function openLimits(){
     '<div><label>Cut-off periods (regular)</label><select id="limCut">' + presets.map(([v, l]) => '<option value="' + v + '"' + (v === cutNow ? ' selected' : '') + '>' + l + '</option>').join('') + '<option value="custom">Other cut-off days…</option></select></div>' +
     '<div><label>Balances start from</label><input id="limStart" type="date" value="' + esc(SD_RULES.balStart || '') + '"><span class="hint">Purchases and deductions before this date are not counted. Blank = ' + esc(fmtDate(DATA_SINCE || recentSince())) + '</span></div></div>' +
     '<label>Manual cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— use these exact dates instead of the regular cut-off (e.g. a payroll period that moved)</span></label>' +
-    '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddP" type="button">+ Add cut-off dates</button>' +
+    '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddM" type="button">+ Add a month (1st &amp; 2nd cut-off)</button> <button class="btn sm" id="limAddP" type="button">+ Add one cut-off</button>' +
     '<div style="height:12px"></div>' +
     (groups.length
       ? '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— blank = use the default · 0 = no limit · small number = employees in that group · Managerial = Manager, Managerial, Consultant · Supervisory = Protect, Supervisor, Supervisory · Rank &amp; File = Rank &amp; File, Rank and File · an unpaid balance lowers the individual employee\'s limit</span></label>' +
@@ -1382,11 +1382,22 @@ function openLimits(){
     const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = default):', ''); if (v === null) return;
     $('modalRoot').querySelectorAll('[data-lim$="|' + b.dataset.fill + '"]').forEach(i => i.value = v.trim());
   });
-  const addP = (f, t) => { const d = document.createElement('div'); d.style.cssText = 'display:flex;gap:6px;align-items:center';
-    d.innerHTML = '<span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
+  const addP = (f, t, tag) => { const d = document.createElement('div'); d.style.cssText = 'display:flex;gap:6px;align-items:center';
+    d.innerHTML = (tag ? '<b style="min-width:92px">' + esc(tag) + '</b>' : '') + '<span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
     d.querySelector('button').onclick = () => d.remove(); $('limPeriods').appendChild(d); };
   (SD_RULES.periods || []).forEach(p => addP(p.from, p.to));
   $('limAddP').onclick = () => addP('', '');
+  // a month = two cut-offs, pre-filled from the regular cut-off days (change the dates as needed)
+  $('limAddM').onclick = () => {
+    const m = prompt('Which month? (e.g. 2026-11)', todayISO().slice(0, 7)); if (!m) return;
+    const mm = /^(\d{4})-(\d{1,2})$/.exec(m.trim()); if (!mm) return toast('Type the month like 2026-11', true);
+    const y = +mm[1], mo = +mm[2] - 1, last = dim(y, mo), c = ($('limCut').value || '15,31').split(',').map(Number);
+    const a = Math.min(c[0] || 15, last), b = Math.min(c[1] || last, last);
+    const mid = isoOf(new Date(y, mo, a)), end = isoOf(new Date(y, mo, b));
+    const name = MONTHS[mo] + ' ' + y;
+    if (c.length > 1 && b >= last){ addP(isoOf(new Date(y, mo, 1)), mid, name + ' · 1st'); addP(addDays(mid, 1), end, name + ' · 2nd'); }
+    else { addP(addDays(isoOf(new Date(y, mo - 1, Math.min(c[1] || last, dim(y, mo - 1)))), 1), mid, name + ' · 1st'); addP(addDays(mid, 1), end, name + ' · 2nd'); }
+  };
   $('limCut').onchange = () => {
     if ($('limCut').value !== 'custom') return;
     const v = prompt('Cut-off days of the month, e.g. "15, 30" (two days) or "25" (monthly). 31 = end of month:', '');
@@ -1404,6 +1415,8 @@ function openLimits(){
     try {
       const periods = [...$('limPeriods').children].map(d => ({from: d.querySelector('[data-pf]').value, to: d.querySelector('[data-pt]').value})).filter(p => p.from && p.to);
       if (periods.some(p => p.from > p.to)) { $('limSave').disabled = false; return toast('A manual cut-off has "from" after "to".', true); }
+      const srt = periods.slice().sort((x, y) => x.from.localeCompare(y.from)), ov = srt.find((p, i) => i && p.from <= srt[i - 1].to);
+      if (ov) { $('limSave').disabled = false; return toast('Manual cut-offs overlap around ' + fmtDate(ov.from) + ' — each day can belong to only one cut-off.', true); }
       SD_RULES = await api('saveSdRules', {limit: num($('limDef').value), cut: $('limCut').value.split(',').map(Number), limits, periods, balStart: $('limStart').value});
       $('modalRoot').innerHTML = ''; onCustomer(true); if (summaryVisible()) fillSdCuts();
       toast('Credit limits saved for all users ✓ — default ' + (SD_RULES.limit ? peso(SD_RULES.limit) : 'no limit') + (Object.keys(limits).length ? ' · ' + Object.keys(limits).length + ' group limit(s)' : ''));
