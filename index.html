@@ -85,7 +85,8 @@
   .qrchk{display:flex!important;align-items:center;gap:6px;margin:6px 0 0!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer}
   .qrchk input{width:auto;margin:0}
   .qrchk.hidden{display:none!important}
-  .paidchk{margin-top:8px!important;padding:5px 8px;border:1px solid #a8d59a;background:#f3faef;border-radius:3px}
+  .paidchk{margin:0!important;padding:.55em .8em;border:1px solid var(--line2);background:#fff;border-radius:3px;white-space:nowrap}
+  .paidchk.on{border-color:#2e7d32;background:#eaf6e4;color:#1e5e22}
   .badge.b-UNPAID{background:#fdecec;color:#a01c1c;border-color:#e3b4b4}
   .badge.b-PAID{background:#eaf6e4;color:#2e7d32;border-color:#a8d59a}
   .btn.paidbtn{background:#fff;border:1px solid #2e7d32;color:#2e7d32;padding:.4em .8em;font-size:max(10px, calc(12.5px * var(--fs)))}
@@ -427,14 +428,16 @@
           <div class="s2"><label>Customer <span class="req">*</span></label>
             <input id="eCust" list="dl-customers" placeholder="Type or pick a name" autocomplete="off">
             <div class="catrow"><span id="eCatBadge" class="badge b-WALKIN">WALK-IN</span><span class="hint" id="eCatWhy"></span></div></div>
-          <div><label>Mode of payment</label><select id="eMode"></select>
-            <div class="qrrow" id="eQRBox"><select id="ePayVia" title="How the customer paid"><option value="CASH">Paid via cash</option><option value="QR">📱 Paid via QR</option><option value="HYB">Cash + QR (split)</option><option value="COD">🚚 COD (cash on delivery)</option></select>
+          <div><label>Mode of payment</label><select id="eMode"></select></div>
+          <div id="eViaCell"><label>Paid via</label>
+            <div class="qrrow" id="eQRBox" style="margin-top:0"><select id="ePayVia" title="How the customer paid"><option value="CASH">Cash</option><option value="QR">📱 QR</option><option value="HYB">Cash + QR (split)</option><option value="COD">🚚 COD (cash on delivery)</option></select>
               <input id="eQRAmt" class="hidden" type="number" min="0" step="any" placeholder="QR amount ₱"></div>
-            <div class="hint hidden" id="eSplitInfo"></div>
-            <label class="qrchk paidchk" id="ePaidBox"><input type="checkbox" id="ePaid"> <b>✔ Paid</b> <span class="hint">(cash received)</span></label></div>
+            <div class="hint hidden" id="eSplitInfo"></div></div>
+          <div id="ePaidCell" style="flex:0 0 auto;min-width:120px"><label>Payment</label>
+            <label class="qrchk paidchk" id="ePaidBox"><input type="checkbox" id="ePaid"> <b>✔ Paid</b></label></div>
           <div id="eTermsBox"><label>Terms (days)</label><input id="eTerms" type="number" min="0"></div>
-          <div class="s2 s2r"><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div>
         </div>
+        <div class="frow" style="grid-template-columns:1fr"><div><label>Remarks</label><input id="eRemarks" placeholder="Optional"></div></div>
 
         <div style="margin-top:14px" class="tablewrap">
           <table class="lines">
@@ -1161,8 +1164,7 @@ function setModes(cat, preferred){
 function syncTerms(){
   $('eTermsBox').classList.toggle('hidden', !(effective().cat === CAT.volume && isCredit($('eMode').value)));
   const cashOk = !isCredit($('eMode').value) && effective().cat !== CAT.employee;
-  $('eQRBox').classList.toggle('hidden', !cashOk); if (!cashOk) $('ePayVia').value = 'CASH';
-  $('ePaidBox').classList.toggle('hidden', !cashOk);
+  $('eViaCell').classList.toggle('hidden', !cashOk); $('ePaidCell').classList.toggle('hidden', !cashOk); if (!cashOk) $('ePayVia').value = 'CASH';
   syncSplit();
 }
 function syncSplit(){
@@ -1247,7 +1249,7 @@ function buildRows(){
 function clearForm(){
   ['eCust','eDR','eIDR','eRemarks','eEmpNo'].forEach(id => $(id).value = '');
   $('ePayVia').value = 'CASH'; $('eQRAmt').value = ''; syncSplit();
-  $('ePaid').checked = store('paidDefault') !== '0';
+  $('ePaid').checked = false; $('ePaidBox').classList.remove('on');
   lastAutoCust = ''; lastEmpFill = ''; autoEmpNo = '';
   $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
   $('eCust').focus();
@@ -2423,8 +2425,20 @@ $('eVerify').addEventListener('change', () => {
   onCustomer(true);
 });
 $('eMode').addEventListener('change', () => { syncTerms(); recalc(); });
-$('ePaid').checked = store('paidDefault') !== '0';
-$('ePaid').addEventListener('change', () => { store('paidDefault', $('ePaid').checked ? '1' : '0'); recalc(); });
+/* Unchecking "Paid" needs the PIN */
+const PAID_PIN = '0000';
+function askPin(what){
+  const v = prompt('Enter the 4-digit PIN to ' + what + ':', '');
+  if (v === null) return false;
+  if (v.trim() !== PAID_PIN){ toast('Wrong PIN — nothing was changed.', true); return false; }
+  return true;
+}
+$('ePaid').addEventListener('change', () => {
+  // ticking is free; un-ticking a ticked box needs the PIN
+  if (!$('ePaid').checked && !askPin('uncheck Paid')) $('ePaid').checked = true;
+  $('ePaidBox').classList.toggle('on', $('ePaid').checked);
+  recalc();
+});
 $('ePayVia').addEventListener('change', () => { syncSplit(); if ($('ePayVia').value === 'HYB') $('eQRAmt').focus(); });
 $('eQRAmt').addEventListener('input', syncSplit);
 $('eDate').addEventListener('change', () => { $('dDate').value = $('eDate').value; renderDay(); onCustomer(true); });
@@ -2456,7 +2470,7 @@ $('dayExpand').onclick = () => { groupsOf(ROWS.filter(r => r._date === $('dDate'
 $('dayCollapse').onclick = () => { DAY_OPEN.clear(); renderDay(); };
 $('dayTable').addEventListener('click', e => {
   const head = e.target.closest('tr.clk');
-  if (head && !e.target.closest('button')){
+  if (head && !e.target.closest('button') && !e.target.closest('[data-paid]')){
     const gk = head.dataset.gk, open = !DAY_OPEN.has(gk);
     open ? DAY_OPEN.add(gk) : DAY_OPEN.delete(gk);
     $('dayTable').querySelectorAll('tr.' + head.dataset.grp).forEach(tr => tr.classList.toggle('hidden', !open));
@@ -2465,7 +2479,7 @@ $('dayTable').addEventListener('click', e => {
   }
   const pd = e.target.closest('[data-paid]');
   if (pd){ const g = groupsOf(ROWS.filter(r => r._date === $('dDate').value)).get(pd.dataset.gk2); if (!g) return;
-    if (pd.dataset.paid === '0' && !confirm('Mark ' + (g[0]._ctrl || g[0].customer) + ' as NOT paid?')) return;
+    if (pd.dataset.paid === '0' && !askPin('mark ' + (g[0]._ctrl || g[0].customer) + ' as NOT paid')) return;
     setPaid(g, pd.dataset.paid === '1'); return; }
   const p = e.target.closest('[data-print]');
   if (p){ const g = groupsOf(ROWS.filter(r => r._date === $('dDate').value)).get(p.dataset.print); if (g) openSlip(g); return; }
