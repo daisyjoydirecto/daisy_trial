@@ -237,6 +237,8 @@
   .auth .lvl div{display:grid;grid-template-columns:1fr 40px;font-weight:700;font-style:italic;line-height:2.2}
   .auth .sig{display:grid;grid-template-columns:1.4fr 1fr;gap:60px;margin-top:46px;text-align:center}
   .auth .sig div{border-top:1px solid #333;padding-top:5px;font-size:12.5px}
+  .cutline{display:none}
+  @media print{.combo .cutline{display:block}}
   .auth .sig b{display:block;margin-bottom:-2px;font-size:13px;position:relative;top:-24px;height:0}
   /* acknowledgement receipt (cash) */
   .ar{background:#fff;color:#111;width:100%;max-width:780px;margin:0 auto;padding:22px 34px 26px;font-family:Calibri,Carlito,var(--font);font-size:14px;box-shadow:0 2px 10px rgba(0,0,0,.12)}
@@ -326,6 +328,23 @@
     #printArea .ar-pair .ar + .ar{margin-top:16mm;padding-top:10mm;border-top:1px dashed #999}
     #printArea .slip th,#printArea .slip tr.tot td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .slip-page{page-break-after:always}
+    /* slip + ATD on one paper: compact both so they share one page */
+    .combo .slip{padding:0!important}
+    .combo .slip .sh img{height:52px}
+    .combo .slip h2{margin:8px 0 8px}
+    .combo .slip .meta{margin-bottom:8px}
+    .combo .slip td{padding:3px 6px}
+    .combo .slip .sign{margin-top:26px}
+    .combo .slip .foot{margin-top:6px}
+    .combo .cutline{text-align:center;color:#888;font-size:11px;margin:10px 0 8px;letter-spacing:.05em}
+    .combo .auth{margin:0!important;padding:0!important}
+    .combo .auth .lbox img{height:46px}
+    .combo .auth .tag{margin-top:6px;line-height:1.8}
+    .combo .auth h2{margin:10px 0 8px}
+    .combo .auth p{line-height:1.65}
+    .combo .auth .mid{margin-top:10px}
+    .combo .auth .lvl div{line-height:1.7}
+    .combo .auth .sig{margin-top:34px}
     .slip-page:last-child{page-break-after:auto}
   }
 </style>
@@ -1832,17 +1851,25 @@ function openSlip(rows, info){
   const slip = slipHtml(rows, info), auth = isEmp ? authHtml(rows, info) : '', ar = cashSale ? arHtml(rows) : '';
   const chk = (id, label, on) => '<label style="color:#fff;display:flex;gap:6px;align-items:center;margin:0;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)))"><input type="checkbox" id="' + id + '" style="width:auto"' + (on ? ' checked' : '') + '> ' + label + '</label>';
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Print · Control No. ' + esc(rows[0]._ctrl || '') + '</h3>' +
-    chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) : '') + (cashSale ? chk('pAR', 'Acknowledgement receipt', true) : '') +
+    chk('pSlip', 'Sales slip', true) + chk('twoCopies', '2 copies', false) + (isEmp ? chk('pAuth', 'Authority to deduct', true) + chk('pOne', 'Slip + ATD on one paper', store('onePaper') !== '0') : '') + (cashSale ? chk('pAR', 'Acknowledgement receipt', true) : '') +
     '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap">' + slip + auth + (ar ? '<div style="height:16px"></div>' + ar : '') + '</div></div></div>';
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => {
     const pages = [];
-    if ($('pSlip').checked) for (let i = 0; i < ($('twoCopies').checked ? 2 : 1); i++) pages.push(slip);
-    if (isEmp && $('pAuth').checked) pages.push(auth);
+    const one = isEmp && $('pOne').checked && $('pSlip').checked && $('pAuth').checked;
+    if (isEmp) store('onePaper', $('pOne').checked ? '1' : '0');
+    if (one){
+      // sales slip (top half) + authority to deduct (bottom half) on the same sheet of paper
+      pages.push({cls: 'combo', html: slip + '<div class="cutline">✂ - - - - - - - - - - - - - - - - cut here - - - - - - - - - - - - - - - -</div>' + auth});
+      if ($('twoCopies').checked) pages.push({cls: 'combo', html: slip + '<div class="cutline">✂ - - - - - - - - - - - - - - - - cut here - - - - - - - - - - - - - - - -</div>' + auth});
+    } else {
+      if ($('pSlip').checked) for (let i = 0; i < ($('twoCopies').checked ? 2 : 1); i++) pages.push(slip);
+      if (isEmp && $('pAuth').checked) pages.push(auth);
+    }
     if (cashSale && $('pAR').checked) pages.push('<div class="ar-pair">' + ar + ($('twoCopies').checked ? ar : '') + '</div>');
     if (!pages.length) return toast('Tick at least one document to print.', true);
-    $('printArea').innerHTML = pages.map(h => '<div class="slip-page">' + h + '</div>').join('');
+    $('printArea').innerHTML = pages.map(h => typeof h === 'string' ? '<div class="slip-page">' + h + '</div>' : '<div class="slip-page ' + h.cls + '" style="zoom:' + (rows.length <= 6 ? .92 : rows.length <= 10 ? .8 : rows.length <= 16 ? .68 : .58) + '">' + h.html + '</div>').join('');
     setTimeout(() => window.print(), 50);
   };
 }
