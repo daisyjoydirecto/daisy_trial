@@ -1529,15 +1529,15 @@ function sdLedgerHtml(from, to, filter){
     '<h2>SALARY DEDUCTION LEDGER</h2><div class="sub">Cut-off <b>' + esc(longDate(p.from)) + ' – ' + esc(longDate(p.to)) + '</b>' + (p.manual ? ' (manual dates)' : '') + ' · ' +
       (closed ? 'payroll deductions uploaded ' + esc(up && up.uploaded || '') : '<span style="color:#a35400">payroll deductions not uploaded yet</span>') + (filter && filter.co ? ' · ' + esc(filter.co) : '') + '</div>' +
     '<div class="boxes" style="grid-template-columns:repeat(6,1fr)"><div><span>Employees</span><b>' + list.length + '</b></div><div' + (nOver ? ' class="overbox"' : '') + '><span>Over the credit limit</span><b>' + nOver + '</b></div><div><span>Beginning balance</span><b>₱' + money(T.beg) + '</b></div><div><span>Purchases this cut-off</span><b>₱' + money(T.pur) + '</b></div><div><span>Deducted (payroll)</span><b>₱' + money(T.ded) + '</b></div><div><span>Remaining balance</span><b>₱' + money(T.end) + '</b></div></div>' +
-    '<table class="sdl"><thead><tr><th style="width:24px">#</th><th>BU</th><th>Emp. No.</th><th>Employee</th><th>Group</th><th class="n">Credit limit</th><th class="n">Beginning bal.</th><th class="n">Purchases</th><th class="n">Deducted</th><th class="n">Remaining bal.</th><th class="n">Limit next</th></tr></thead><tbody>' +
+    '<table class="sdl"><thead><tr><th style="width:24px">#</th><th>BU</th><th>Emp. No.</th><th>Employee</th><th>Group</th><th class="n">Credit limit</th><th class="n">Beginning bal.</th><th class="n">Purchases</th><th class="n">Deducted</th><th class="n">Remaining bal.</th><th class="n">Next limit</th></tr></thead><tbody>' +
       (list.length ? list.map((x, n) => {
         const base = x.emp ? limitFor(x.emp) : 0;
-        const nextLim = base > 0 ? r2(Math.max(0, base - Math.max(0, closed ? x.end[i] : 0))) : null;
+        const nextLim = x._lim === null ? null : r2(Math.max(0, x._lim - x.end[i]));   // Next limit = Credit limit − Remaining balance
         return '<tr class="' + (x._over ? 'over' : x.end[i] > 0.005 ? 'owe' : '') + '"' + (x._over ? ' title="Purchases are over the credit limit by ' + money(r2(x.purch[i] - x._lim)) + '"' : '') + '><td>' + (n + 1) + '</td><td>' + esc(x.company || '—') + '</td><td>' + esc(x.empNo || '') + '</td><td><b>' + esc(x.name) + '</b>' + (x.emp ? '' : ' <span class="hint">(not in list)</span>') + (x._over ? '<br><span class="overtag">▲ over by ₱' + money(r2(x.purch[i] - x._lim)) + '</span>' : '') + '</td><td>' + esc(payGroupLabel(x.group)) + '</td>' +
           '<td class="n">' + (x._lim === null ? '—' : money(x._lim)) + '</td><td class="n">' + M(x.beg[i]) + '</td><td class="n">' + (x._over ? '<b>' + M(x.purch[i]) + '</b>' : M(x.purch[i])) + '</td><td class="n">' + M(x.ded[i]) + '</td><td class="n"><b>' + M(x.end[i]) + '</b></td><td class="n">' + (nextLim === null ? '—' : money(nextLim)) + '</td></tr>';
       }).join('') : '<tr><td colspan="11" style="text-align:center;padding:14px;color:#777">No salary deduction activity in this cut-off.</td></tr>') +
       '<tr class="tot"><td colspan="6" style="text-align:right">TOTAL</td><td class="n">' + money(T.beg) + '</td><td class="n">' + money(T.pur) + '</td><td class="n">' + money(T.ded) + '</td><td class="n">' + money(T.end) + '</td><td></td></tr></tbody></table>' +
-    '<div class="hint" style="margin-top:6px;color:#555">Credit limit = the employee\'s limit for this cut-off (less any unpaid balance). <span style="color:#c62828;font-weight:700">Red</span> = purchases over the credit limit. Remaining balance = beginning balance + purchases − payroll deduction. Balances count from ' + esc(fmtDate(L.start)) + '. "Limit next" = the employee\'s credit limit for the next cut-off after the unpaid balance is taken off (only once the deductions of this cut-off are uploaded).</div>' +
+    '<div class="hint" style="margin-top:6px;color:#555">Credit limit = the employee\'s limit for this cut-off (less any unpaid balance). <span style="color:#c62828;font-weight:700">Red</span> = purchases over the credit limit. Remaining balance = beginning balance + purchases − payroll deduction. Balances count from ' + esc(fmtDate(L.start)) + '. "Next limit" = credit limit − remaining balance (0 when the balance is equal to or more than the limit).</div>' +
     '<div class="sig3"><div>Prepared by</div><div>Checked by</div><div>Noted by (Payroll)</div></div>' +
     '<div class="foot"><span>Sales Meat &amp; Livestock · salary deduction</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
   '</div>';
@@ -1563,9 +1563,9 @@ function openSdLedger(){
     const L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
     const q = x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
     const rows = [...L.people.values()].filter(x => (x.beg[i] || x.purch[i] || x.ded[i] || x.end[i]) && (!f.co || x.company === f.co));
-    const lines = [['Cut-off from','Cut-off to','Business unit','Employee No.','Employee','Group','Credit limit','Over limit','Beginning balance','Purchases','Deducted','Remaining balance'].join(',')]
+    const lines = [['Cut-off from','Cut-off to','Business unit','Employee No.','Employee','Group','Credit limit','Over limit','Beginning balance','Purchases','Deducted','Remaining balance','Next limit'].join(',')]
       .concat(rows.map(x => { const lim = sdLimitAt(L, x, i), over = lim !== null && x.purch[i] > lim + 0.005;
-        return [from, to, x.company, x.empNo, x.name, payGroupLabel(x.group), lim === null ? '' : lim, over ? 'OVER by ' + r2(x.purch[i] - lim) : '', r2(x.beg[i]), r2(x.purch[i]), r2(x.ded[i]), r2(x.end[i])].map(q).join(','); }));
+        return [from, to, x.company, x.empNo, x.name, payGroupLabel(x.group), lim === null ? '' : lim, over ? 'OVER by ' + r2(x.purch[i] - lim) : '', r2(x.beg[i]), r2(x.purch[i]), r2(x.ded[i]), r2(x.end[i]), lim === null ? '' : r2(Math.max(0, lim - x.end[i]))].map(q).join(','); }));
     download('salary-deduction-ledger-' + from + '.csv', '﻿' + lines.join('\n'), 'text/csv');
   };
 }
