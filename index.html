@@ -85,7 +85,7 @@
   .frow .s2{grid-column:span 2}.frow .s4{grid-column:1/-1}
   @media(max-width:760px){.frow{grid-template-columns:1fr 1fr}.frow .s2{grid-column:1/-1}}
   .span2{grid-column:span 2} @media(max-width:520px){.span2{grid-column:span 1}}
-  .docpair{display:flex;gap:6px}.docpair select{width:84px;flex:none}
+  .docpair{display:flex;gap:6px}.docpair input{flex:1;min-width:0}
   .verifybar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;background:#fafcf3;border:1px dashed var(--lime);border-radius:3px;padding:calc(12px * var(--fs) + 3px) calc(14px * var(--fs) + 4px);margin:-2px 0 calc(14px * var(--fs) + 4px);font-size:max(11.2px, calc(14px * var(--fs)))}
   .verifybar .vf{min-width:110px;flex:0 0 calc(180px * var(--fs) + 60px)}
   .verifybar .vf.idf{flex:0 0 calc(160px * var(--fs) + 50px)}
@@ -317,8 +317,8 @@
           <div><label>Representative</label><select id="eRep"></select></div>
           <div><label>Customer category</label>
             <select id="eCat"><option value="W">Walk-in</option><option value="V">Volume buyer</option><option value="E">Salary deduction</option></select></div>
-          <div><label>DR / IND # <span class="req">*</span></label>
-            <div class="docpair"><select id="eDocType"><option value="DR">DR</option><option value="IND">IND</option></select><input id="eDocNo" placeholder="Number"></div></div>
+          <div><label>DR # / IDR # <span class="req">*</span> <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">(at least one)</span></label>
+            <div class="docpair"><input id="eDR" placeholder="DR #" title="Goes to the DR # column"><input id="eIDR" placeholder="IDR # (Inhouse)" title="Goes to the INHOUSE DR# column"></div></div>
         </div>
 
         <div class="verifybar hidden" id="eVerifyBar">
@@ -925,7 +925,7 @@ function buildRows(){
   const lines = [...$('lineBody').querySelectorAll('tr')].map(lineValues).filter(v => v.particulars || v.weight || v.amount);
   const errs = [];
   if (!date) errs.push('date'); if (!$('eRep').value) errs.push('representative'); if (!$('eCust').value.trim()) errs.push('customer');
-  if (!$('eDocNo').value.trim()) errs.push($('eDocType').value + ' #');
+  if (!$('eDR').value.trim() && !$('eIDR').value.trim()) errs.push('DR # or IDR #');
   if (e.cat === CAT.employee){
     if (verifyOn() && !e.emp) errs.push('salary deduction is only for employees in the Employees list');
     else if (verifyOn() && !e.regular) errs.push('salary deduction is only for REGULAR employees (' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization') + ')');
@@ -945,7 +945,7 @@ function buildRows(){
     return {rep: $('eRep').value, source: SOURCE, custCat: e.cat, date, month: MONTHS[+date.slice(5,7) - 1], customer: $('eCust').value.trim(),
       particulars: v.particulars, prodCat: v.prodCat, heads: v.heads, weight: v.weight,
       rate: v.unit === 'HEAD' ? r2(v.amount / v.weight) : v.rate, amount: v.amount, payment: pay || '',
-      withhold: false, balance: bal, mode, terms, dr: $('eDocType').value === 'DR' ? $('eDocNo').value.trim() : '', inhouseDr: $('eDocType').value === 'IND' ? $('eDocNo').value.trim() : '',
+      withhold: false, balance: bal, mode, terms, dr: $('eDR').value.trim(), inhouseDr: $('eIDR').value.trim(),
       due, daysOverdue: bal > 0 && due ? Math.max(0, daysBetween(due, today)) : '-',
       payStatus: bal <= 0.005 ? 'PAID' : (due && due < today ? 'OVERDUE' : 'NOT YET DUE'), remarks};
   });
@@ -953,7 +953,7 @@ function buildRows(){
   return {rows, info: {emp: empInfo, company: e.company}};
 }
 function clearForm(){
-  ['eCust','eDocNo','eRemarks','eEmpNo'].forEach(id => $(id).value = '');
+  ['eCust','eDR','eIDR','eRemarks','eEmpNo'].forEach(id => $(id).value = '');
   $('ePayVia').value = 'CASH'; $('eQRAmt').value = ''; syncSplit();
   lastAutoCust = ''; lastEmpFill = ''; autoEmpNo = '';
   $('lineBody').innerHTML = ''; addLine(); addLine(); onCustomer();
@@ -1061,7 +1061,7 @@ function slipHtml(rows, info){
       '</div>' +
       '<div style="display:grid;gap:4px;grid-template-columns:1fr">' +
         R('Control No.:', '<b>' + esc(ctrl) + '</b>') + R('Payment Option:', payOpt) + R('Terms:', isBlank(r0.terms) || num(r0.terms) === 0 ? '' : esc(r0.terms) + ' days') +
-        (r0.inhouseDr && !r0.dr ? R('IND #:', esc(r0.inhouseDr)) : R('DR #:', esc(r0.dr)) + (r0.inhouseDr ? R('IND #:', esc(r0.inhouseDr)) : '')) +
+        (r0.inhouseDr && !r0.dr ? R('IDR #:', esc(r0.inhouseDr)) : R('DR #:', esc(r0.dr)) + (r0.inhouseDr ? R('IDR #:', esc(r0.inhouseDr)) : '')) +
       '</div>' +
     '</div>' +
     '<table><thead><tr><th style="width:36px">No.</th><th>Item Description</th><th style="width:70px">Qnty</th><th style="width:50px">Units</th><th style="width:80px">Rate</th><th style="width:100px">Amount</th></tr></thead><tbody>' + lines +
@@ -1094,7 +1094,7 @@ function arHtml(rows){
   const ctrl = r0._ctrl || r0[CONTROL_FIELD] || '';
   const total = rows.reduce((a, r) => a + r._amt, 0);
   const pre = arPre(s);
-  const docs = [r0.dr ? 'DR# ' + r0.dr : '', r0.inhouseDr ? 'IND# ' + r0.inhouseDr : ''].filter(Boolean).join(' · ');
+  const docs = [r0.dr ? 'DR# ' + r0.dr : '', r0.inhouseDr ? 'IDR# ' + r0.inhouseDr : ''].filter(Boolean).join(' · ');
   const items = rows.map(r => r.particulars + (r._kg ? ' ' + kgf(r._kg) + 'kg' : '')).join(', ');
   const forTxt = 'Meat/Livestock purchase' + (ctrl ? ' · Ctrl# ' + ctrl : '') + (docs ? ' · ' + docs : '') + (isQR(r0.mode) ? ' · paid via QR' : isHyb(r0.mode) ? (() => { const sp = splitOf(rows); return ' · paid Cash ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr); })() : '') + ' — ' + items;
   const F = (label, val, cls) => '<div class="ln"><span>' + label + '</span><span class="f' + (cls ? ' ' + cls : '') + '">' + (val || '&nbsp;') + '</span></div>';
@@ -1127,7 +1127,7 @@ function ledgerHtml(date, no, editable){
     S.cash += sp.cash; S.qr += sp.qr; S.other += sp.other;
     if (sp.via === 'Cash') S.nCash++; else if (sp.via === 'QR') S.nQR++; else if (sp.via === 'Cash + QR') S.nHyb++; else S.nOther++;
     const viaTxt = sp.via === 'Cash + QR' ? 'Cash ₱' + money(sp.cash) + ' + QR ₱' + money(sp.qr) : sp.via;
-    const docs = [r0.dr ? 'DR ' + r0.dr : '', r0.inhouseDr ? 'IND ' + r0.inhouseDr : ''].filter(Boolean).join(' / ');
+    const docs = [r0.dr ? 'DR ' + r0.dr : '', r0.inhouseDr ? 'IDR ' + r0.inhouseDr : ''].filter(Boolean).join(' / ');
     const lines = list.map((r, j) => '<tr class="li">' +
       (j === 0 ? '<td>' + i + '</td><td>' + esc(r0._ctrl || '') + (r0._pending ? ' ⏳' : '') + '</td><td>' + esc(docs) + '</td><td><b>' + esc(r0.customer) + '</b><br><span style="color:#666">' + esc(r0.custCat) + ' · ' + esc(r0.rep) + '</span></td><td>' + (editable && sp.via !== 'Online/Bank'
         ? '<select class="viasel' + (sp.via !== 'Cash' ? ' on' : '') + '" data-via="' + esc(gkOf(r0)) + '">' + [['CASH','Cash'],['QR','QR'],['HYB','Cash + QR']].map(([v, l]) => '<option value="' + v + '"' + ((v === 'CASH' && sp.via === 'Cash') || (v === 'QR' && sp.via === 'QR') || (v === 'HYB' && sp.via === 'Cash + QR') ? ' selected' : '') + '>' + l + '</option>').join('') + '</select>'
@@ -1149,7 +1149,7 @@ function ledgerHtml(date, no, editable){
     '<h2>DAILY CASH LEDGER</h2><div class="sub"><b>' + esc(longDate(date)) + '</b> (' + DAYS[dn.getDay()] + ') · Sales Meat &amp; Livestock' + (pend ? ' · ⏳ includes sales not yet uploaded to the sheet' : '') + '</div>' +
     '<div class="boxes" style="grid-template-columns:repeat(' + (VIA.length + 1) + ',1fr)"><div><span>Total cash sales</span><b>₱' + money(total) + '</b> <span style="display:inline;text-transform:none;letter-spacing:0">(' + groups.length + ' trans. · ' + kgf(kg) + ' kg)</span></div>' +
       VIA.map(x => '<div><span>' + (x.v === 'Cash' ? 'Cash received' : x.v === 'QR' ? 'Received via QR' : 'Online / bank') + '</span><b>₱' + money(x.amt) + '</b> <span style="display:inline;text-transform:none;letter-spacing:0">(' + x.n + ')</span></div>').join('') + '</div>' +
-    '<table><thead><tr><th style="width:24px">#</th><th style="width:66px">Control No.</th><th style="width:84px">DR / IND</th><th>Customer</th><th style="width:86px">Paid via</th><th>Particulars</th><th class="n" style="width:54px">Kg</th><th class="n" style="width:64px">Rate</th><th class="n" style="width:84px">Amount (₱)</th></tr></thead><tbody>' +
+    '<table><thead><tr><th style="width:24px">#</th><th style="width:66px">Control No.</th><th style="width:84px">DR / IDR</th><th>Customer</th><th style="width:86px">Paid via</th><th>Particulars</th><th class="n" style="width:54px">Kg</th><th class="n" style="width:64px">Rate</th><th class="n" style="width:84px">Amount (₱)</th></tr></thead><tbody>' +
       (body || '<tr><td colspan="9" style="text-align:center;padding:14px;color:#777">No cash sales on this day.</td></tr>') +
       '<tr class="tot"><td colspan="6" style="text-align:right">TOTAL CASH SALES</td><td class="n">' + kgf(kg) + '</td><td></td><td class="n">' + money(total) + '</td></tr></tbody></table>' +
     '<table class="brk"><thead><tr><th>Payment breakdown</th><th class="n">Transactions</th><th class="n">Amount (₱)</th></tr></thead><tbody>' +
@@ -1278,7 +1278,7 @@ function authHtml(rows, info){
   const lvl = /manag/i.test(grp) ? 'M' : /supervis|pro-?tech|technical|professional/i.test(grp) ? 'P' : /rank/i.test(grp) ? 'R' : '';
   const box = c => '( ' + (lvl === c ? '✔' : '&nbsp;&nbsp;') + ' )';
   const name = esc(emp ? displayName(emp.name) : r0.customer);
-  const refs = ['Sales Slip Control No. ' + esc(r0._ctrl || ''), r0.dr ? 'DR# ' + esc(r0.dr) : '', r0.inhouseDr ? 'IND# ' + esc(r0.inhouseDr) : '', slashDate(r0._date)].filter(Boolean).join(' · ');
+  const refs = ['Sales Slip Control No. ' + esc(r0._ctrl || ''), r0.dr ? 'DR# ' + esc(r0.dr) : '', r0.inhouseDr ? 'IDR# ' + esc(r0.inhouseDr) : '', slashDate(r0._date)].filter(Boolean).join(' · ');
   return '<div class="auth">' +
     '<div class="ah"><div class="lbox"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""></div>' +
       '<div class="tag">TAGGED UNDER: <span>' + esc(company || '') + '</span><br>ID NO: <span>' + esc((emp && emp.empNo) || '') + '</span></div></div>' +
@@ -1350,7 +1350,7 @@ function openEdit(r){
   if (needOnline('Editing')) return;
   const F = [['date','Date','date',r._date],['rep','Representative','rep',r.rep],['customer','Customer','text',r.customer],['custCat','Customer category','cat',r.custCat],
     ['particulars','Product','prod',r.particulars],['heads','Heads','text',r.heads],['weight','Weight (kg)','number',r._kg],['rate','Rate (per kg)','number',r._rate],
-    ['amount','Amount','number',r._amt],['mode','Mode of payment','mode',r.mode],['terms','Terms','number',r.terms],['dr','DR #','text',r.dr],['inhouseDr','IND #','text',r.inhouseDr],['remarks','Remarks','text',r.remarks]];
+    ['amount','Amount','number',r._amt],['mode','Mode of payment','mode',r.mode],['terms','Terms','number',r.terms],['dr','DR #','text',r.dr],['inhouseDr','IDR # (Inhouse)','text',r.inhouseDr],['remarks','Remarks','text',r.remarks]];
   const inp = ([k, l, t, v]) => {
     let el;
     if (t === 'rep') el = '<select data-f="rep">' + LISTS.reps.map(o => '<option' + (o.name === v ? ' selected' : '') + '>' + esc(o.name) + '</option>').join('') + (LISTS.reps.some(o => o.name === v) ? '' : '<option selected>' + esc(v) + '</option>') + '</select>';
@@ -1677,8 +1677,6 @@ $('eVerify').addEventListener('change', () => {
 $('eMode').addEventListener('change', () => { syncTerms(); recalc(); });
 $('ePayVia').addEventListener('change', () => { syncSplit(); if ($('ePayVia').value === 'HYB') $('eQRAmt').focus(); });
 $('eQRAmt').addEventListener('input', syncSplit);
-$('eDocType').value = store('docType') || 'DR';
-$('eDocType').addEventListener('change', () => store('docType', $('eDocType').value));
 $('eDate').addEventListener('change', () => { $('dDate').value = $('eDate').value; renderDay(); onCustomer(true); });
 $('eRep').addEventListener('change', () => store('rep', $('eRep').value));
 $('ePrintAfter').checked = store('printAfter') !== '0';
