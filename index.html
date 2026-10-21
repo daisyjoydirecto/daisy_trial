@@ -150,6 +150,23 @@
   .modal .mh h3{margin:0;font-size:max(13.6px, calc(17px * var(--fs)));flex:1}
   .modal .body{padding:16px 18px}
   .modal .foot{padding:12px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+  .overlay.chk{background:rgba(0,0,0,.55)}
+  .chkmodal{max-width:620px;border:3px solid #c62828}
+  .chkmodal .body{font-size:max(13px, calc(15px * var(--fs)))}
+  .chklist{margin:0;padding-left:20px;line-height:1.6;font-size:max(13px, calc(15px * var(--fs)))}
+  .crbox{border:2px solid #c62828;border-radius:4px;padding:14px 16px;background:#fff5f5;margin-bottom:12px}
+  .crhead{color:#c62828;font-weight:800;letter-spacing:.08em;font-size:max(15px, calc(18px * var(--fs)))}
+  .crname{font-weight:700;font-size:max(15px, calc(18px * var(--fs)));margin-top:4px}
+  .crcut{color:#555;margin-bottom:10px}
+  .crgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .crgrid div{background:#fff;border:1px solid #e3b4b4;border-radius:3px;padding:8px}
+  .crgrid span{display:block;font-size:max(10px, calc(11px * var(--fs)));text-transform:uppercase;letter-spacing:.08em;color:#666}
+  .crgrid b{font-size:max(15px, calc(19px * var(--fs)))}
+  .crgrid small{display:block;color:#777;font-size:max(10px, calc(11px * var(--fs)))}
+  .crgrid .left b{color:#2e7d32}
+  .crgrid .sale b{color:#c62828}
+  .crtip{margin:10px 0 0}
+  @media(max-width:600px){.crgrid{grid-template-columns:1fr 1fr}}
   .toast{position:fixed;bottom:18px;right:18px;background:var(--black);color:#fff;border-left:4px solid var(--lime);padding:11px 15px;border-radius:3px;z-index:99;font-size:max(10.8px, calc(13.5px * var(--fs)));max-width:440px;box-shadow:0 6px 20px rgba(0,0,0,.3)}
   .toast.err{border-left-color:#ff6b5b;background:#2a0f0c}
   .iconbtn{border:none;background:none;cursor:pointer;font-size:max(12px, calc(15px * var(--fs)));padding:2px 5px;color:var(--muted2)}
@@ -1071,6 +1088,7 @@ function buildRows(){
   const date = $('eDate').value, e = effective(), mode0 = $('eMode').value.trim(), via = !isCredit(mode0) && e.cat !== CAT.employee ? $('ePayVia').value : 'CASH', mode = via === 'QR' ? QR_MODE : via === 'COD' ? COD_MODE : via === 'HYB' ? HYB_MODE : mode0, terms = $('eTermsBox').classList.contains('hidden') ? (e.cat === CAT.employee ? '0' : '') : $('eTerms').value.trim();
   const today = todayISO(), credit = isCredit(mode), due = credit ? addDays(date, num(terms)) : '';
   const lines = [...$('lineBody').querySelectorAll('tr')].map(lineValues).filter(v => v.particulars || v.weight || v.amount);
+  let creditErr = null;
   const errs = [];
   if (!date) errs.push('date'); if (!$('eRep').value) errs.push('representative'); if (!$('eCust').value.trim()) errs.push('customer');
   if (!$('eDR').value.trim() && !$('eIDR').value.trim()) errs.push('DR # or IDR #');
@@ -1081,15 +1099,17 @@ function buildRows(){
     if (!verifyOn() && !e.empNo) errs.push('ID # for the Authority to Deduct');
     if (verifyOn() && e.emp && e.regular){
       const ci = creditInfo(e.emp, date), tot = lines.reduce((a, v) => a + v.amount, 0);
-      if (ci && r2(ci.used + tot) > ci.limit + 0.005)
+      if (ci && r2(ci.used + tot) > ci.limit + 0.005){
+        creditErr = Object.assign({name: e.emp.name, company: e.emp.company, sale: r2(tot)}, ci);
         errs.push('credit limit — ' + e.emp.name + ' has used ' + peso(ci.used) + ' of ' + peso(ci.limit) + (ci.carried > 0 ? ' (limit ' + peso(ci.base) + ' less unpaid balance ' + peso(ci.carried) + ')' : '') + ' for the ' + ci.period.label + ' cut-off; only ' + peso(ci.left) + ' left (this sale is ' + peso(tot) + ')');
+      }
     }
   }
   if (!lines.length) errs.push('at least one product line');
   if (via === 'HYB'){ const tot = lines.reduce((a, v) => a + v.amount, 0), q = num($('eQRAmt').value);
     if (!(q > 0) || q >= r2(tot)) errs.push('QR amount for Cash + QR (more than 0 and less than the total ' + peso(tot) + ')'); }
   lines.forEach((v, i) => { if (!v.particulars || !v.amount || !v.weight) errs.push('line ' + (i+1) + ' (product, weight and rate)'); });
-  if (errs.length) return {errs};
+  if (errs.length) return {errs, creditErr};
   let remarks = $('eRemarks').value.trim();
   if (via === 'HYB') remarks = '[QR ' + r2(num($('eQRAmt').value)).toFixed(2) + ']' + (remarks ? ' | ' + remarks : '');
   if (e.cat === CAT.employee) remarks = '[' + e.company + ']' + (e.empNo ? ' EMP# ' + e.empNo : '') + (e.emp && e.emp.dept && !e.manual ? ' · ' + e.emp.dept : '') + (remarks ? ' | ' + remarks : '');
@@ -1115,7 +1135,7 @@ function clearForm(){
 async function saveSale(){
   if (custTimer){ clearTimeout(custTimer); custTimer = null; onCustomer(); }   // finish the name check first
   const b = buildRows();
-  if (b.errs) return toast('Please check: ' + b.errs.join('; '), true);
+  if (b.errs) return showCheck(b.errs, b.creditErr);
   const btn = $('btnSave'); btn.disabled = true; btn.textContent = 'Saving…';
   const uid = DEVICE + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   store('rep', $('eRep').value);
@@ -1171,6 +1191,30 @@ async function saveSale(){
     }
   } catch (e){ toast('Save failed: ' + (e.message || e), true); }
   btn.disabled = false; btn.textContent = 'Save sale';
+}
+
+/** Big, centred message when a sale cannot be saved (instead of a small toast in the corner). */
+function showCheck(errs, cr){
+  const others = errs.filter(x => !/^credit limit/.test(x));
+  const box = cr ? '<div class="crbox">' +
+      '<div class="crhead">✖ CREDIT LIMIT REACHED</div>' +
+      '<div class="crname">' + esc(cr.name) + (cr.company ? ' · ' + esc(cr.company) : '') + '</div>' +
+      '<div class="crcut">Cut-off ' + esc(cr.period.label) + '</div>' +
+      '<div class="crgrid">' +
+        '<div><span>Credit limit</span><b>' + peso(cr.limit) + '</b>' + (cr.carried > 0 ? '<small>' + peso(cr.base) + ' less unpaid balance ' + peso(cr.carried) + '</small>' : '') + '</div>' +
+        '<div><span>Already used</span><b>' + peso(cr.used) + '</b></div>' +
+        '<div class="left"><span>Remaining</span><b>' + peso(cr.left) + '</b></div>' +
+        '<div class="sale"><span>This sale</span><b>' + peso(cr.sale) + '</b><small>over by ' + peso(r2(cr.sale - cr.left)) + '</small></div>' +
+      '</div>' +
+      '<p class="crtip">' + (cr.left > 0 ? 'Reduce this sale to <b>' + peso(cr.left) + '</b> or less, or let the employee pay the rest in cash as a separate sale.' : 'No credit left for this cut-off. The employee can pay in cash (Walk-in) or wait for the next cut-off.') + '</p>' +
+    '</div>' : '';
+  $('modalRoot').innerHTML = '<div class="overlay chk"><div class="modal chkmodal"><div class="mh" style="background:#7a1414;border-color:#c62828"><h3>⚠ Cannot save yet</h3></div><div class="body">' +
+    box + (others.length ? '<div style="font-weight:700;margin-bottom:6px">Please check:</div><ul class="chklist">' + others.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    '</div><div class="foot"><button class="btn primary lg" id="chkOk">OK</button></div></div></div>';
+  const close = () => { $('modalRoot').innerHTML = ''; document.removeEventListener('keydown', key2); };
+  const key2 = e => { if (e.key === 'Enter' || e.key === 'Escape'){ e.preventDefault(); close(); } };
+  document.addEventListener('keydown', key2);
+  $('chkOk').onclick = close; $('chkOk').focus();
 }
 
 /* ================= PRINTABLE SLIP ================= */
