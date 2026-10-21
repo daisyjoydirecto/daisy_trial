@@ -77,6 +77,12 @@
   .qrchk{display:flex!important;align-items:center;gap:6px;margin:6px 0 0!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer}
   .qrchk input{width:auto;margin:0}
   .qrchk.hidden{display:none!important}
+  .upstatus{margin:10px auto 0;max-width:720px;padding:9px 14px;border-radius:3px;font-weight:700;display:flex;gap:10px;align-items:center;justify-content:center}
+  .upstatus.busy{background:#eef4ff;color:#1f4fa8;border:1px solid #b9cdf5}
+  .upstatus.ok{background:#eaf6e4;color:#2e7d32;border:1px solid #a8d59a}
+  .upstatus.err{background:#fdecec;color:#a01c1c;border:1px solid #e3b4b4}
+  .upstatus .spin{width:16px;height:16px;border:3px solid #b9cdf5;border-top-color:#1f4fa8;border-radius:50%;animation:spin .8s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
   select.stsel{width:auto;padding:2px 6px;font-size:max(10.5px, calc(12.5px * var(--fs)))}
   select.stsel.reg{color:#2e7d32;font-weight:700}
   select.stsel.changed{border-color:#f0a020;background:#fff8e6}
@@ -484,6 +490,7 @@
             <input type="file" id="upFile" accept=".xlsx,.xls,.csv" style="width:auto">
           </div>
           <div class="hint" style="margin-top:6px">Uploading replaces that company's list for all users. Saved in the hidden Employees tab of the Google Sheet.</div>
+          <div id="upStatus" class="upstatus hidden"></div>
         </div>
         <div class="toolbar"><input id="eSearch" placeholder="Search employee…" style="max-width:260px"><span id="eInfo" class="hint"></span><span style="flex:1"></span><button class="btn sm" id="eClearComp">Remove this company's list</button></div>
         <div class="tablewrap" style="max-height:56vh"><table id="empTable"></table></div>
@@ -736,7 +743,7 @@ const PAY_GROUPS = [{k: 'RANKANDFILE', label: 'Rank & File'}, {k: 'SUPERVISORY',
 function payGroupAuto(p){
   const s = key(p);
   if (/MANAGER|CONSULTANT/.test(s)) return 'MANAGERIAL';
-  if (/PROTECT|SUPERVIS/.test(s)) return 'SUPERVISORY';
+  if (/PROTEC|SUPERVIS/.test(s)) return 'SUPERVISORY';   // Protech / Protect / Supervisor / Supervisory
   if (/RANK|^RF$|^RNF$/.test(s)) return 'RANKANDFILE';
   return 'OTHER';
 }
@@ -1450,7 +1457,7 @@ function openLimits(){
     '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddM" type="button">+ Add a month (1st &amp; 2nd cut-off)</button> <button class="btn sm" id="limAddP" type="button">+ Add one cut-off</button>' +
     '<div style="height:14px"></div>' +
     (vals.length
-      ? '<label>Payroll groups in your employee lists <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— automatic: Manager / Managerial / Consultant → Managerial · Protect / Supervisor / Supervisory → Supervisory · Rank &amp; File / Rank and File → Rank &amp; File · anything else → Other. Change any line if needed.</span></label>' +
+      ? '<label>Payroll groups in your employee lists <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— automatic: Manager / Managerial / Consultant → Managerial · Protech / Supervisor / Supervisory → Supervisory · Rank &amp; File / Rank and File → Rank &amp; File · anything else → Other. Change any line if needed.</span></label>' +
         '<div class="tablewrap" style="max-height:30vh;margin:6px 0 14px"><table><thead><tr><th>Payroll group (as written in the file)</th><th class="n">Employees</th><th>Counted as</th></tr></thead><tbody>' +
         vals.map(v => '<tr><td>' + esc(v.label) + '</td><td class="n">' + v.n + '</td><td><select data-gm="' + esc(v.k) + '" style="width:auto">' +
           PAY_GROUPS.concat([{k: 'OTHER', label: 'Other (not matched)'}]).map(g => '<option value="' + g.k + '"' + (payGroup(v.label === '(blank — no payroll group)' ? '' : v.label, tmpMap) === g.k ? ' selected' : '') + '>' + g.label + '</option>').join('') +
@@ -2121,8 +2128,15 @@ function parseEmployeeGrid(grid, forceStatus){
   }
   return {list: out, cols: Object.keys(map), headerRow: (grid[hi] || []).map(h => String(h ?? '').trim()), statusCol: map.status, grid};
 }
+/** Status line under the upload box: busy (with spinner) · ok · err */
+function upMsg(kind, text){
+  const b = $('upStatus'); if (!b) return;
+  b.className = 'upstatus ' + kind; b.innerHTML = (kind === 'busy' ? '<span class="spin"></span>' : kind === 'ok' ? '✔' : '✖') + '<span>' + esc(text) + '</span>';
+}
+let UP_RESULT = '';
 async function uploadEmployees(file, company){
   if (!ONLINE) throw new Error('uploading employees needs an internet connection');
+  upMsg('busy', 'Reading ' + file.name + '…');
   await needXLSX();
   const wb = XLSX.read(new Uint8Array(await readFile(file)), {type:'array', cellDates:true});
   // look at every sheet of the file and use the one with the most employees
@@ -2148,16 +2162,17 @@ async function uploadEmployees(file, company){
   if (coded / list.length >= 0.9) list.forEach(e => { const c = codeOf(e) || company; (groups[c] = groups[c] || []).push(e); });
   else groups[company] = list;
   const summary = Object.keys(groups).map(c => c + ': ' + groups[c].length + ' (was ' + (LISTS.employees[c] || []).length + ')').join('\n');
-  if (!confirm('Replace employee list?\n\n' + summary)) return null;
+  if (!confirm('Replace employee list?\n\n' + summary)) { upMsg('err', 'Upload cancelled — nothing was changed.'); return null; }
+  upMsg('busy', 'Uploading ' + Object.keys(groups).map(c => c + ' (' + groups[c].length + ')').join(', ') + ' to the Google Sheet… please wait');
   applyLists(await api('saveEmployees', groups)); buildIndex(); onCustomer(true);
   const sent = Object.keys(groups).some(c => groups[c].some(e => e.status));
   const kept = Object.keys(groups).some(c => (LISTS.employees[c] || []).some(e => e.status));
-  if (sent && !kept) toast('Employee Status was NOT saved — please deploy the latest Code.gs (v22 or newer) as a New version, then upload this list again.', true);
-  else if (!sent) toast('Note: no Employee Status was read from this file — only the Date of Regularization is used.', true);
-  else {
-    const all = Object.keys(groups).flatMap(c => groups[c]), reg = all.filter(e => isRegularStatus(e.status)).length;
-    toast('Employee Status read from column "' + (res.headerRow[res.statusCol] || '?') + '": ' + reg + ' Regular · ' + (all.length - reg) + ' not Regular / blank ✓');
-  }
+  const all = Object.keys(groups).flatMap(c => groups[c]), reg = all.filter(e => isRegularStatus(e.status)).length;
+  const at = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const what = Object.keys(groups).map(c => c + ': ' + groups[c].length + ' employees').join(' · ');
+  if (sent && !kept) UP_RESULT = ['err', 'Uploaded ' + what + ', but Employee Status was NOT saved — deploy Code.gs v22 or newer as a New version, then upload again.'];
+  else if (!sent) UP_RESULT = ['ok', 'Uploaded successfully at ' + at + ' — ' + what + ' · no Employee Status column (only Date of Regularization is used)'];
+  else UP_RESULT = ['ok', 'Uploaded successfully at ' + at + ' — ' + what + ' · Employee Status from "' + (res.headerRow[res.statusCol] || '?') + '": ' + reg + ' Regular, ' + (all.length - reg) + ' not Regular / blank'];
   return Object.keys(groups);
 }
 
@@ -2315,8 +2330,10 @@ $('upComp').addEventListener('change', () => { EMPCOMP = $('upComp').value; rend
 $('eSearch').addEventListener('input', renderEmployees);
 $('upFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
-  try { const done = await uploadEmployees(f, $('upComp').value); if (done){ EMPCOMP = done[0]; renderLtabs(); renderEmployees(); toast('Employee list updated: ' + done.join(', ') + ' ✓'); } }
-  catch (err){ toast('Upload failed: ' + err.message, true); }
+  $('upFile').disabled = true; UP_RESULT = '';
+  try { const done = await uploadEmployees(f, $('upComp').value); if (done){ EMPCOMP = done[0]; renderLtabs(); renderEmployees(); upMsg(UP_RESULT[0] || 'ok', UP_RESULT[1] || 'Uploaded successfully: ' + done.join(', ')); toast(UP_RESULT[0] === 'err' ? 'Uploaded with a problem — see the message under the upload box' : 'Employee list uploaded ✓', UP_RESULT[0] === 'err'); } }
+  catch (err){ upMsg('err', 'Upload FAILED — ' + (err.offline ? 'no internet connection' : (err.message || err)) + '. Nothing was changed.'); toast('Upload failed', true); }
+  $('upFile').disabled = false;
   e.target.value = '';
 });
 $('eClearComp').onclick = () => {
