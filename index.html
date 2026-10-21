@@ -680,17 +680,25 @@ function periodsBetween(fromIso, toIso){
 /* ---------- payroll groups: only 3 categories ---------- */
 const PAY_GROUPS = [{k: 'RANKANDFILE', label: 'Rank & File'}, {k: 'SUPERVISORY', label: 'Supervisory'}, {k: 'MANAGERIAL', label: 'Managerial'}];
 /** Manager / Managerial / Consultant → MANAGERIAL · Protect / Supervisor / Supervisory → SUPERVISORY · Rank & File → RANKANDFILE */
-function payGroup(p){
+function payGroupAuto(p){
   const s = key(p);
   if (/MANAGER|CONSULTANT/.test(s)) return 'MANAGERIAL';
   if (/PROTECT|SUPERVIS/.test(s)) return 'SUPERVISORY';
-  if (/RANK/.test(s)) return 'RANKANDFILE';
+  if (/RANK|^RF$|^RNF$/.test(s)) return 'RANKANDFILE';
   return 'OTHER';
 }
-const payGroupLabel = k => (PAY_GROUPS.find(g => g.k === k) || {label: 'Other / blank'}).label;
-function payrollGroups(){
-  const other = COMPANIES.some(c => (LISTS.employees[c] || []).some(e => payGroup(e.payroll) === 'OTHER'));
-  return PAY_GROUPS.concat(other ? [{k: 'OTHER', label: 'Other / blank'}] : []);
+/** Group of a payroll-group value: your own choice in 💳 Credit limits, else the automatic rule above. */
+function payGroup(p, map){ const m = map || SD_RULES.groupMap || {}, k = key(p) || 'BLANK'; return m[k] || payGroupAuto(p); }
+const payGroupLabel = k => (PAY_GROUPS.find(g => g.k === k) || {label: 'Other (not matched)'}).label;
+/** Every payroll-group value in the employee lists: [{k, label, n}] */
+function payrollValues(){
+  const m = new Map();
+  COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { const k = key(e.payroll) || 'BLANK'; const x = m.get(k) || {k, label: String(e.payroll || '').trim() || '(blank — no payroll group)', n: 0}; x.n++; m.set(k, x); }));
+  return [...m.values()].sort((a, b) => b.n - a.n);
+}
+function payrollGroups(map){
+  const other = COMPANIES.some(c => (LISTS.employees[c] || []).some(e => payGroup(e.payroll, map) === 'OTHER'));
+  return PAY_GROUPS.concat(other ? [{k: 'OTHER', label: 'Other (not matched)'}] : []);
 }
 /** Base limit for this employee: business unit + payroll group, else the default. 0 = no limit. */
 function limitFor(emp){
@@ -711,7 +719,7 @@ function sdWho(name, empNo){
   return emp ? {id: 'E:' + (emp.empNo ? key(emp.empNo) : nameKey(emp.name)), emp, name: emp.name} : {id: 'N:' + nameKey(name), emp: null, name: String(name || '').trim()};
 }
 const isSdRow = r => r.custCat === CAT.employee || /SALARY|DEDUC/i.test(r.custCat);
-const sdStart = () => SD_RULES.balStart || DATA_SINCE || recentSince();
+const sdStart = () => SD_RULES.balStart || ((SD_RULES.periods || []).map(p => p.from).sort()[0]) || DATA_SINCE || recentSince();
 let SD_MEMO = {k: '', v: null};
 /** Ledger from the balance start date up to the cut-off that contains `uptoIso`. */
 function sdLedger(uptoIso){
@@ -1353,73 +1361,72 @@ function saveLocalCopy(){
 }
 /* ================= CREDIT LIMITS: business unit × payroll group ================= */
 function openLimits(){
-  const groups = payrollGroups(), L = SD_RULES.limits || {};
-  const def = num(SD_RULES.limit), cutNow = (SD_RULES.cut || [15, 31]).join(',');
-  const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => payGroup(e.payroll) === g).length;
-  const presets = [['15,31','1–15 and 16–end of month'],['10,25','11–25 and 26–10'],['5,20','6–20 and 21–5'],['31','Monthly (1–end of month)']];
-  if (!presets.some(p => p[0] === cutNow)) presets.push([cutNow, 'Cut-off days ' + cutNow.replace(',', ' & ')]);
+  const L = SD_RULES.limits || {}, vals = payrollValues();
+  const tmpMap = Object.assign({}, SD_RULES.groupMap || {});
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>💳 Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
-    '<p class="hint" style="margin-top:0">Shared by all users. Checked when employee verification is ON: an employee who reaches the limit cannot avail more salary deduction until the next cut-off.' + (SD_RULES.updated ? ' Last changed ' + esc(SD_RULES.updated) + '.' : '') + '</p>' +
-    '<div class="fgrid" style="margin-bottom:12px"><div><label>Default limit per employee per cut-off (₱, 0 = no limit)</label><input id="limDef" type="number" min="0" step="any" value="' + esc(def || 0) + '"></div>' +
-    '<div><label>Cut-off periods (regular)</label><select id="limCut">' + presets.map(([v, l]) => '<option value="' + v + '"' + (v === cutNow ? ' selected' : '') + '>' + l + '</option>').join('') + '<option value="custom">Other cut-off days…</option></select></div>' +
-    '<div><label>Balances start from</label><input id="limStart" type="date" value="' + esc(SD_RULES.balStart || '') + '"><span class="hint">Purchases and deductions before this date are not counted. Blank = ' + esc(fmtDate(DATA_SINCE || recentSince())) + '</span></div></div>' +
-    '<label>Manual cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— use these exact dates instead of the regular cut-off (e.g. a payroll period that moved)</span></label>' +
+    '<p class="hint" style="margin-top:0">Shared by all users. Checked when employee verification is ON: an employee who reaches the limit cannot avail more salary deduction until the next cut-off. An unpaid balance lowers that employee\'s own limit.' + (SD_RULES.updated ? ' Last changed ' + esc(SD_RULES.updated) + '.' : '') + '</p>' +
+    '<label>Cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— two cut-offs per month. Days not covered here follow 1–15 and 16–end of month.</span></label>' +
     '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddM" type="button">+ Add a month (1st &amp; 2nd cut-off)</button> <button class="btn sm" id="limAddP" type="button">+ Add one cut-off</button>' +
-    '<div style="height:12px"></div>' +
-    (groups.length
-      ? '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— blank = use the default · 0 = no limit · small number = employees in that group · Managerial = Manager, Managerial, Consultant · Supervisory = Protect, Supervisor, Supervisory · Rank &amp; File = Rank &amp; File, Rank and File · an unpaid balance lowers the individual employee\'s limit</span></label>' +
-        '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
-        COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
-          const k = c + '|' + g.k, n = cnt(c, g.k);
-          return '<td><input type="number" min="0" step="any" data-lim="' + esc(k) + '" placeholder="default" value="' + (L[k] !== undefined ? esc(L[k]) : '') + '"' + (n ? '' : ' style="opacity:.55"') + '><span class="hint">' + n + ' emp.</span></td>';
-        }).join('') + '</tr>').join('') +
-        '</tbody></table></div>' +
-        '<div class="toolbar" style="margin-top:10px"><span class="hint">Fill a whole column: </span>' + groups.map(g => '<button class="btn sm" data-fill="' + esc(g.k) + '">' + esc(g.label) + '</button>').join('') + '</div>'
-      : '<p class="hint">Upload the employee lists (Rates &amp; Lists → Employees) to set different limits per business unit and payroll group. Until then the default limit applies to everyone.</p>') +
+    '<div style="height:14px"></div>' +
+    (vals.length
+      ? '<label>Payroll groups in your employee lists <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— automatic: Manager / Managerial / Consultant → Managerial · Protect / Supervisor / Supervisory → Supervisory · Rank &amp; File / Rank and File → Rank &amp; File · anything else → Other. Change any line if needed.</span></label>' +
+        '<div class="tablewrap" style="max-height:30vh;margin:6px 0 14px"><table><thead><tr><th>Payroll group (as written in the file)</th><th class="n">Employees</th><th>Counted as</th></tr></thead><tbody>' +
+        vals.map(v => '<tr><td>' + esc(v.label) + '</td><td class="n">' + v.n + '</td><td><select data-gm="' + esc(v.k) + '" style="width:auto">' +
+          PAY_GROUPS.concat([{k: 'OTHER', label: 'Other (not matched)'}]).map(g => '<option value="' + g.k + '"' + (payGroup(v.label === '(blank — no payroll group)' ? '' : v.label, tmpMap) === g.k ? ' selected' : '') + '>' + g.label + '</option>').join('') +
+          '</select>' + (tmpMap[v.k] ? ' <span class="hint">(set by you)</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>' +
+        '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— ₱ per employee per cut-off · blank = no limit · small number = employees in that group</span></label>' +
+        '<div id="limMatrix"></div>'
+      : '<p class="hint">Upload the employee lists (Rates &amp; Lists → Employees) first — the limits are set per business unit and payroll group.</p>') +
     '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="limSave">Save for all users</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
-  $('modalRoot').querySelectorAll('[data-fill]').forEach(b => b.onclick = () => {
-    const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = default):', ''); if (v === null) return;
-    $('modalRoot').querySelectorAll('[data-lim$="|' + b.dataset.fill + '"]').forEach(i => i.value = v.trim());
+  // limits table (redrawn when a payroll group is moved to another column)
+  const drawMatrix = () => {
+    if (!$('limMatrix')) return;
+    const keep = {}; $('limMatrix').querySelectorAll('[data-lim]').forEach(i => keep[i.dataset.lim] = i.value);
+    const groups = payrollGroups(tmpMap);
+    const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => payGroup(e.payroll, tmpMap) === g).length;
+    $('limMatrix').innerHTML = '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
+      COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
+        const k = c + '|' + g.k, n = cnt(c, g.k), v = keep[k] !== undefined ? keep[k] : (L[k] !== undefined ? L[k] : '');
+        return '<td><input type="number" min="0" step="any" data-lim="' + esc(k) + '" placeholder="no limit" value="' + esc(v) + '"' + (n ? '' : ' style="opacity:.55"') + '><span class="hint">' + n + ' emp.</span></td>';
+      }).join('') + '</tr>').join('') + '</tbody></table></div>' +
+      '<div class="toolbar" style="margin-top:10px"><span class="hint">Fill a whole column: </span>' + groups.map(g => '<button class="btn sm" data-fill="' + esc(g.k) + '">' + esc(g.label) + '</button>').join('') + '</div>';
+    $('limMatrix').querySelectorAll('[data-fill]').forEach(b => b.onclick = () => {
+      const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = no limit):', ''); if (v === null) return;
+      $('limMatrix').querySelectorAll('[data-lim$="|' + b.dataset.fill + '"]').forEach(i => i.value = v.trim());
+    });
+  };
+  drawMatrix();
+  $('modalRoot').querySelectorAll('[data-gm]').forEach(sel => sel.onchange = () => {
+    const v = vals.find(x => x.k === sel.dataset.gm);
+    if (sel.value === payGroupAuto(v && v.label !== '(blank — no payroll group)' ? v.label : '')) delete tmpMap[sel.dataset.gm]; else tmpMap[sel.dataset.gm] = sel.value;
+    drawMatrix();
   });
   const addP = (f, t, tag) => { const d = document.createElement('div'); d.style.cssText = 'display:flex;gap:6px;align-items:center';
-    d.innerHTML = (tag ? '<b style="min-width:92px">' + esc(tag) + '</b>' : '') + '<span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
+    if (!tag && f){ const dt = new Date(f + 'T00:00:00'); tag = MONTHS[dt.getMonth()] + ' ' + dt.getFullYear() + (dt.getDate() <= 10 || (+f.slice(8) < 16 && +t.slice(8) <= 20) ? ' · 1st' : ' · 2nd'); }
+    d.innerHTML = '<b style="min-width:130px">' + esc(tag || 'Cut-off') + '</b><span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
     d.querySelector('button').onclick = () => d.remove(); $('limPeriods').appendChild(d); };
-  (SD_RULES.periods || []).forEach(p => addP(p.from, p.to));
+  (SD_RULES.periods || []).slice().sort((a, b) => a.from.localeCompare(b.from)).forEach(p => addP(p.from, p.to));
   $('limAddP').onclick = () => addP('', '');
-  // a month = two cut-offs, pre-filled from the regular cut-off days (change the dates as needed)
   $('limAddM').onclick = () => {
     const m = prompt('Which month? (e.g. 2026-11)', todayISO().slice(0, 7)); if (!m) return;
     const mm = /^(\d{4})-(\d{1,2})$/.exec(m.trim()); if (!mm) return toast('Type the month like 2026-11', true);
-    const y = +mm[1], mo = +mm[2] - 1, last = dim(y, mo), c = ($('limCut').value || '15,31').split(',').map(Number);
-    const a = Math.min(c[0] || 15, last), b = Math.min(c[1] || last, last);
-    const mid = isoOf(new Date(y, mo, a)), end = isoOf(new Date(y, mo, b));
-    const name = MONTHS[mo] + ' ' + y;
-    if (c.length > 1 && b >= last){ addP(isoOf(new Date(y, mo, 1)), mid, name + ' · 1st'); addP(addDays(mid, 1), end, name + ' · 2nd'); }
-    else { addP(addDays(isoOf(new Date(y, mo - 1, Math.min(c[1] || last, dim(y, mo - 1)))), 1), mid, name + ' · 1st'); addP(addDays(mid, 1), end, name + ' · 2nd'); }
-  };
-  $('limCut').onchange = () => {
-    if ($('limCut').value !== 'custom') return;
-    const v = prompt('Cut-off days of the month, e.g. "15, 30" (two days) or "25" (monthly). 31 = end of month:', '');
-    const d = (v || '').split(/[^\d]+/).map(Number).filter(x => x >= 1 && x <= 31).slice(0, 2);
-    if (!d.length){ $('limCut').value = cutNow; return; }
-    const val = d.sort((a, b) => a - b).join(',');
-    if (![...$('limCut').options].some(o => o.value === val)) $('limCut').insertAdjacentHTML('afterbegin', '<option value="' + val + '">Cut-off days ' + val.replace(',', ' & ') + '</option>');
-    $('limCut').value = val;
+    const y = +mm[1], mo = +mm[2] - 1, mid = isoOf(new Date(y, mo, 15)), name = MONTHS[mo] + ' ' + y;
+    addP(isoOf(new Date(y, mo, 1)), mid, name + ' · 1st'); addP(addDays(mid, 1), isoOf(new Date(y, mo, dim(y, mo))), name + ' · 2nd');
   };
   $('limSave').onclick = async () => {
     if (needOnline('Saving the credit limits')) return;
     const limits = {};
     $('modalRoot').querySelectorAll('[data-lim]').forEach(i => { if (i.value.trim() !== '') limits[i.dataset.lim] = num(i.value); });
+    const periods = [...$('limPeriods').children].map(d => ({from: d.querySelector('[data-pf]').value, to: d.querySelector('[data-pt]').value})).filter(p => p.from && p.to);
+    if (periods.some(p => p.from > p.to)) return toast('A cut-off has "from" after "to".', true);
+    const srt = periods.slice().sort((x, y) => x.from.localeCompare(y.from)), ov = srt.find((p, i) => i && p.from <= srt[i - 1].to);
+    if (ov) return toast('Cut-offs overlap around ' + fmtDate(ov.from) + ' — each day can belong to only one cut-off.', true);
     $('limSave').disabled = true;
     try {
-      const periods = [...$('limPeriods').children].map(d => ({from: d.querySelector('[data-pf]').value, to: d.querySelector('[data-pt]').value})).filter(p => p.from && p.to);
-      if (periods.some(p => p.from > p.to)) { $('limSave').disabled = false; return toast('A manual cut-off has "from" after "to".', true); }
-      const srt = periods.slice().sort((x, y) => x.from.localeCompare(y.from)), ov = srt.find((p, i) => i && p.from <= srt[i - 1].to);
-      if (ov) { $('limSave').disabled = false; return toast('Manual cut-offs overlap around ' + fmtDate(ov.from) + ' — each day can belong to only one cut-off.', true); }
-      SD_RULES = await api('saveSdRules', {limit: num($('limDef').value), cut: $('limCut').value.split(',').map(Number), limits, periods, balStart: $('limStart').value});
+      SD_RULES = await api('saveSdRules', {limit: 0, cut: [15, 31], limits, periods, balStart: '', groupMap: tmpMap});
       $('modalRoot').innerHTML = ''; onCustomer(true); if (summaryVisible()) fillSdCuts();
-      toast('Credit limits saved for all users ✓ — default ' + (SD_RULES.limit ? peso(SD_RULES.limit) : 'no limit') + (Object.keys(limits).length ? ' · ' + Object.keys(limits).length + ' group limit(s)' : ''));
+      toast('Credit limits saved for all users ✓ — ' + Object.keys(limits).length + ' limit(s) set');
     } catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
   };
 }
@@ -2051,7 +2058,7 @@ function openSettings(){
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Salary deduction</h2>' +
     '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)));color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:14px">Salary deduction credit limit</h2>' +
-    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn sm" id="stLimits" type="button">💳 Set credit limits…</button><span class="hint">' + (num(SD_RULES.limit) ? 'Default ' + peso(SD_RULES.limit) : 'No default limit') + ' · ' + Object.keys(SD_RULES.limits || {}).length + ' group limit(s) · cut-off ' + esc((SD_RULES.cut || [15, 31]).join(' & ')) + '</span></div>' +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn sm" id="stLimits" type="button">💳 Set credit limits…</button><span class="hint">' + Object.keys(SD_RULES.limits || {}).length + ' limit(s) set · ' + (SD_RULES.periods || []).length + ' cut-off(s) entered' + '</span></div>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
       '<div class="span2"><label>Company name</label><input id="stCo" value="' + esc(s.company) + '"></div>' +
       '<div class="span2"><label>Address</label><input id="stAddr" value="' + esc(s.address) + '"></div>' +
