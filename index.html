@@ -707,6 +707,7 @@ function cutoffOf(iso){
 /** Cut-off periods from one date to another, in order. */
 function periodsBetween(fromIso, toIso){
   const out = []; let p = cutoffOf(fromIso), guard = 0;
+  if (p.from < fromIso) p = Object.assign({}, p, {from: fromIso, label: fmtDate(fromIso).replace(/ \d{4}$/, '') + ' – ' + fmtDate(p.to) + ' · pay day ' + payDayOf(p.to) + ' (ledger start)'});
   while (p.from <= toIso && guard++ < 200){ out.push(p); p = cutoffOf(addDays(p.to, 1)); }
   return out;
 }
@@ -753,7 +754,8 @@ function sdWho(name, empNo){
   return emp ? {id: 'E:' + (emp.empNo ? key(emp.empNo) : nameKey(emp.name)), emp, name: emp.name} : {id: 'N:' + nameKey(name), emp: null, name: String(name || '').trim()};
 }
 const isSdRow = r => r.custCat === CAT.employee || /SALARY|DEDUC/i.test(r.custCat);
-const sdStart = () => SD_RULES.balStart || ((SD_RULES.periods || []).map(p => p.from).sort()[0]) || DATA_SINCE || recentSince();
+const SD_START = '2026-10-10';   // salary deduction ledger starts here — purchases and deductions before this date are not counted
+const sdStart = () => SD_RULES.balStart || SD_START;
 let SD_MEMO = {k: '', v: null};
 /** Ledger from the balance start date up to the cut-off that contains `uptoIso`. */
 function sdLedger(uptoIso){
