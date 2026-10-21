@@ -662,7 +662,7 @@ function buildIndex(){
   ROWS.forEach(r => { if (r.customer && r.custCat === CAT.walkin) CUSTS.W.set(key(r.customer), [r.customer, 'Walk-in']); });
   LISTS.volumeBuyers.forEach(o => CUSTS.V.set(key(o.name), [o.name, 'Volume buyer']));
   ROWS.forEach(r => { if (r.customer && r.custCat === CAT.volume && !CUSTS.V.has(key(r.customer))) CUSTS.V.set(key(r.customer), [r.customer, 'Volume buyer (past sale)']); });
-  COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { const dn = displayName(e.name); if (!CUSTS.E.has(key(dn))) CUSTS.E.set(key(dn), [dn, c + ' · ' + (isRegular(Object.assign({}, e)) ? 'Regular' : 'NOT regular') + (e.dept ? ' · ' + e.dept : '')]); }));
+  COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { const dn = displayName(e.name); if (!CUSTS.E.has(key(dn))) CUSTS.E.set(key(dn), [dn, c + ' · ' + (isRegular(Object.assign({}, e)) ? 'Regular' : 'NOT regular (' + (e.status ? 'status: ' + e.status : 'no Employee Status') + (toISO(e.regular) ? ', regularized ' + toISO(e.regular) : '') + ')') + (e.dept ? ' · ' + e.dept : '')]); }));
   setCustList();
   $('eBU').innerHTML = COMPANIES.map(c => '<option>' + c + '</option>').join('');
   $('dl-products').innerHTML = LISTS.rates.map(o => '<option value="' + esc(o.particulars) + '">' + esc(o.prodCat || '') + '</option>').join('');
