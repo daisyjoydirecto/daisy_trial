@@ -475,7 +475,7 @@
       <div id="empPane" class="hidden">
         <div class="ltabs" id="compTabs"></div>
         <div class="drop" style="margin-bottom:10px">
-          <b>Upload updated employee list</b> <span class="hint">(Excel or CSV with columns: Employee No. · Employee Name · Position · Department · Payroll Group · Date Hired · Date of Regularization)</span><br>
+          <b>Upload updated employee list</b> <span class="hint">(Excel or CSV with columns: Employee No. · Employee Name · Position · Department · Payroll Group · Date Hired · Date of Regularization · Employee Status)</span><br>
           <div style="display:flex;gap:8px;justify-content:center;align-items:center;margin-top:8px;flex-wrap:wrap">
             <span class="hint">Company:</span><select id="upComp" style="width:auto"></select>
             <input type="file" id="upFile" accept=".xlsx,.xls,.csv" style="width:auto">
@@ -680,7 +680,19 @@ function setCustList(){
   $('eCust').placeholder = c === 'W' ? 'Walk-in name — pick a past customer or type a new name' : c === 'V' ? 'Volume buyer — pick from the list or type a new name' : 'Employee name (must be in the Employees list)';
 }
 /** Regular = has a Date of Regularization on or before the sale date. */
-function isRegular(emp, onDate){ const r = toISO(emp && emp.regular); return /^\d{4}-\d{2}-\d{2}$/.test(r) && r <= (onDate || todayISO()); }
+/** Regular? Date of Regularization on/before the date; if there is no date, Employee Status must be "Regular". */
+function isRegular(emp, onDate){
+  const r = toISO(emp && emp.regular);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return r <= (onDate || todayISO());
+  return isRegularStatus(emp && emp.status);
+}
+function isRegularStatus(st){ st = String(st || '').toUpperCase(); return /\bREGULAR\b/.test(st) && !/IRREGULAR|NON[\s-]*REGULAR|PROBATION|NOT\s+REGULAR/.test(st); }
+/** Short text about regular status for messages. */
+function regText(emp){
+  const r = toISO(emp && emp.regular);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(r)) return 'regular on ' + fmtDate(r);
+  return emp && emp.status ? 'no date of regularization · status: ' + emp.status : 'no date of regularization and no employee status';
+}
 function verifyOn(){ return settings().verifyEmp !== false; }
 /* ---------- salary deduction credit limit per cut-off ---------- */
 /* Company cut-offs: orders 26th–10th → pay day 8th · orders 11th–25th → pay day 23rd */
@@ -1014,8 +1026,8 @@ function onCustomer(keepMode){
   else if (!V){ badge = 'SALARY DEDUCTION · ' + $('eBU').value; cls = 'b-EMP'; why = 'Verification OFF' + ($('eEmpNo').value.trim() ? ' · ID # ' + $('eEmpNo').value.trim() : ' · type the ID # above'); }
   else if (!e.emp){ badge = '✖ NOT IN EMPLOYEES LIST'; cls = 'b-NO'; why = 'Salary deduction is only for employees in the list'; }
   else if (!e.regular){ badge = (V ? '✖ NOT YET REGULAR · ' : 'NOT REGULAR · ') + e.emp.company; cls = V ? 'b-NO' : 'b-EMP';
-    why = 'Emp# ' + (e.emp.empNo || '—') + ' · ' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization'); }
-  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular));
+    why = 'Emp# ' + (e.emp.empNo || '—') + ' · ' + regText(e.emp); }
+  else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + (/^\d{4}-\d{2}-\d{2}$/.test(toISO(e.emp.regular)) ? ' · regular since ' + fmtDate(toISO(e.emp.regular)) : ' · status: ' + (e.emp.status || 'Regular'));
     const ci = creditInfo(e.emp, $('eDate').value);
     if (ci){
       why += ' · ' + payGroupLabel(payGroup(e.emp.payroll)) + ' limit ' + peso(ci.base) + (ci.carried > 0 ? ' − carried over-limit balance ' + peso(ci.carried) + ' = ' + peso(ci.limit) : '') + ' · Credit ' + ci.period.label + ': used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' · ' + peso(ci.left) + ' left';
@@ -1111,7 +1123,7 @@ function buildRows(){
   if (!$('eDR').value.trim() && !$('eIDR').value.trim()) errs.push('DR # or IDR #');
   if (e.cat === CAT.employee){
     if (verifyOn() && !e.emp) errs.push('salary deduction is only for employees in the Employees list');
-    else if (verifyOn() && !e.regular) errs.push('salary deduction is only for REGULAR employees (' + (toISO(e.emp.regular) ? 'regular on ' + fmtDate(toISO(e.emp.regular)) : 'no date of regularization') + ')');
+    else if (verifyOn() && !e.regular) errs.push('salary deduction is only for REGULAR employees (' + regText(e.emp) + ')');
     else if (!e.company) errs.push('business unit');
     if (!verifyOn() && !e.empNo) errs.push('ID # for the Authority to Deduct');
     if (verifyOn() && e.emp && e.regular){
@@ -2042,9 +2054,9 @@ function renderEmployees(){
   const list = LISTS.employees[EMPCOMP] || [], q = $('eSearch').value.trim().toLowerCase();
   const shown = list.filter(e => !q || [e.empNo, e.name, e.position, e.dept, e.payroll].join(' ').toLowerCase().includes(q));
   $('eInfo').textContent = shown.length + ' of ' + list.length + (LISTS.empUpdated[EMPCOMP] ? ' · uploaded ' + LISTS.empUpdated[EMPCOMP] : ' · no list uploaded yet');
-  $('empTable').innerHTML = '<thead><tr><th>Employee No.</th><th>Employee Name</th><th>Position</th><th>Department</th><th>Payroll Group</th><th>Date Hired</th><th>Date of Regularization</th></tr></thead><tbody>' +
-    (shown.length ? shown.slice(0, 1000).map(e => '<tr><td>' + esc(e.empNo) + '</td><td><b>' + esc(e.name) + '</b></td><td>' + esc(e.position) + '</td><td>' + esc(e.dept) + '</td><td>' + esc(e.payroll) + '</td><td>' + esc(fmtDate(e.hired)) + '</td><td>' + esc(fmtDate(e.regular)) + '</td></tr>').join('')
-      : '<tr><td colspan="7" class="muted" style="padding:18px;text-align:center">No employees for ' + EMPCOMP + ' yet — upload the list above.</td></tr>') + '</tbody>';
+  $('empTable').innerHTML = '<thead><tr><th>Employee No.</th><th>Employee Name</th><th>Position</th><th>Department</th><th>Payroll Group</th><th>Date Hired</th><th>Date of Regularization</th><th>Employee Status</th></tr></thead><tbody>' +
+    (shown.length ? shown.slice(0, 1000).map(e => '<tr><td>' + esc(e.empNo) + '</td><td><b>' + esc(e.name) + '</b></td><td>' + esc(e.position) + '</td><td>' + esc(e.dept) + '</td><td>' + esc(e.payroll) + '</td><td>' + esc(fmtDate(e.hired)) + '</td><td>' + esc(fmtDate(e.regular)) + '</td><td>' + esc(e.status || '') + '</td></tr>').join('')
+      : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No employees for ' + EMPCOMP + ' yet — upload the list above.</td></tr>') + '</tbody>';
 }
 function xlDate(v){
   if (typeof v === 'number' && v > 20000 && v < 80000) return isoOf(new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4));
@@ -2064,7 +2076,8 @@ const EMP_ALIASES = {
   dept:    ['DEPARTMENT','DEPT','SECTION','DIVISION','UNIT'],
   payroll: ['PAYROLLGROUP','PAYROLL','RANKLEVEL','RANK','EMPLOYEECLASS','CLASSIFICATION','LEVEL'],
   hired:   ['DATEHIRED','HIREDATE','DATEOFHIRE','DATEEMPLOYED','HIRED','DATESTARTED','STARTDATE'],
-  regular: ['DATEOFREGULARIZATION','REGULARIZATIONDATE','DATEREGULARIZED','DATEOFREGULAR','REGULARIZATION','DATEREGULAR','REGULARDATE']
+  regular: ['DATEOFREGULARIZATION','REGULARIZATIONDATE','DATEREGULARIZED','DATEOFREGULAR','REGULARIZATION','DATEREGULAR','REGULARDATE'],
+  status:  ['EMPLOYEESTATUS','EMPLOYMENTSTATUS','EMPSTATUS','STATUSOFEMPLOYMENT','STATUS']
 };
 function empHeaderMap(row){
   const map = {}, used = new Set();
@@ -2072,7 +2085,7 @@ function empHeaderMap(row){
   [true, false].forEach(exact => Object.keys(EMP_ALIASES).forEach(f => {
     if (map[f] !== undefined) return;
     for (const al of EMP_ALIASES[f]){
-      const i = row.findIndex((h, j) => !used.has(j) && key(h) && (exact ? key(h) === al : (al.length >= 4 && key(h).includes(al) && !(f === 'name' && /NO$|NUMBER|ID$|CODE|COMPANY|DEPART|BRANCH|POSITION|FATHER|MOTHER|SPOUSE|CONTACT|EMERGENCY|SUPERVISOR|MANAGER/.test(key(h))))));
+      const i = row.findIndex((h, j) => !used.has(j) && key(h) && (exact ? key(h) === al : (al.length >= 4 && key(h).includes(al) && !(f === 'name' && /NO$|NUMBER|ID$|CODE|COMPANY|DEPART|BRANCH|POSITION|FATHER|MOTHER|SPOUSE|CONTACT|EMERGENCY|SUPERVISOR|MANAGER/.test(key(h))) && !(f === 'status' && /CIVIL|TAX|MARITAL/.test(key(h))) && !(f === 'regular' && /STATUS/.test(key(h))))));
       if (i >= 0){ map[f] = i; used.add(i); break; }
     }
   }));
@@ -2099,7 +2112,7 @@ function parseEmployeeGrid(grid){
     }
     if (!name || key(name) === key(grid[hi][map.name])) continue;
     out.push({empNo: String(g(r, 'empNo') ?? '').trim(), name: name.replace(/\s+/g, ' '), position: String(g(r, 'position') ?? '').trim(), dept: String(g(r, 'dept') ?? '').trim(),
-      payroll: String(g(r, 'payroll') ?? '').trim(), hired: xlDate(g(r, 'hired')), regular: xlDate(g(r, 'regular'))});
+      payroll: String(g(r, 'payroll') ?? '').trim(), hired: xlDate(g(r, 'hired')), regular: xlDate(g(r, 'regular')), status: String(g(r, 'status') ?? '').trim()});
   }
   return {list: out, cols: Object.keys(map)};
 }
