@@ -253,6 +253,7 @@
   .ledger .via.v-COD{border-color:#a35400;color:#a35400}
   .ledger .via.v-CASHQR{border-color:#1f4fa8;color:#1f4fa8}
   .ledger .viaedit.on{background:#1f4fa8;color:#fff;border-style:solid}
+  .ledger tr.owe td{background:#fff8ef}
   .ledger .dh{font-size:12px;letter-spacing:.12em;margin:16px 0 6px}
   .ledger .dens{display:grid;grid-template-columns:1fr 1fr 0.9fr;gap:16px;align-items:start}
   .ledger .dt{font-weight:700;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
@@ -409,6 +410,13 @@
       <div style="width:170px"><input type="date" id="ledDate"></div>
       <button class="btn primary" id="btnLedger">🖨 Print cash ledger</button>
     </div>
+    <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0;flex:1">Salary deduction ledger</h2>
+      <span class="hint">Per employee per cut-off — purchases, payroll deductions and running balance</span>
+      <select id="sdCut" style="width:auto;min-width:210px"></select>
+      <button class="btn sm" id="btnSdUpload">⬆ Upload deducted employees</button>
+      <button class="btn primary" id="btnSdLedger">📒 Open ledger</button>
+    </div>
     <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
       <div style="display:flex;align-items:center;padding:10px 14px"><h2 style="margin:0;flex:1">Daily sales — Cash vs Credit / Salary deduct</h2><button class="btn sm" id="btnDailyCsv">Export CSV</button></div>
       <div style="overflow:auto"><table class="daily" id="dailyTable"></table></div>
@@ -564,7 +572,7 @@ async function showSaved(){
     const c = await IDB.get('cache'); if (!c || !c.d) return;
     if (c.lists) applyLists(c.lists);
     const d = c.d;
-    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}}, d.config.sdRules); }
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}, periods: [], balStart: ''}, d.config.sdRules); }
     ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); })).concat(pendingRows());
     DATA_SINCE = d.since || ''; CACHE_AT = c.at;
     if (d.url){ $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden'); }
@@ -576,7 +584,7 @@ async function showSaved(){
 function showConnect(msg){ const c = conn(); $('cUrl').value = c.url; $('cKey').value = c.key; $('cErr').textContent = msg || ''; $('connectBox').classList.remove('hidden'); }
 
 /* ================= shared lists (kept in hidden tabs of the Google Sheet) ================= */
-function emptyLists(){ const e = {}; COMPANIES.forEach(c => e[c] = []); return {v:0, rates:[], reps:[], prodCats:[], volumeBuyers:[], employees:e, empUpdated:{}}; }
+function emptyLists(){ const e = {}; COMPANIES.forEach(c => e[c] = []); return {v:0, rates:[], reps:[], prodCats:[], volumeBuyers:[], employees:e, empUpdated:{}, deductions:[]}; }
 let LISTS_V = '';
 function applyLists(l){ if (!l) return; const base = emptyLists(); Object.assign(base, l); COMPANIES.forEach(c => base.employees[c] = (l.employees || {})[c] || []); LISTS = base; LISTS_V = l.v; }
 function loadLocal(){  // older versions kept lists in the browser — used once to move them to the shared file
@@ -643,50 +651,114 @@ function setCustList(){
 function isRegular(emp, onDate){ const r = toISO(emp && emp.regular); return /^\d{4}-\d{2}-\d{2}$/.test(r) && r <= (onDate || todayISO()); }
 function verifyOn(){ return settings().verifyEmp !== false; }
 /* ---------- salary deduction credit limit per cut-off ---------- */
-let SD_RULES = {limit: 0, cut: [15, 31], limits: {}};   // shared by all users (kept on the server, changed in ⚙ Settings)
+let SD_RULES = {limit: 0, cut: [15, 31], limits: {}, periods: [], balStart: ''};   // shared by all users (kept on the server, changed in ⚙ Settings)
 const dim = (y, m) => new Date(y, m + 1, 0).getDate();   // days in month (m = 0-11)
 /** Cut-off period that contains the date: {from, to, label}. cut = cut-off days, e.g. [15,31] → 1–15 and 16–end of month. */
 function cutoffOf(iso){
-  const [y, m, d] = iso.split('-').map(Number), ends = [];
+  const P = (SD_RULES.periods || []).filter(p => p.from && p.to);
+  const man = P.find(p => iso >= p.from && iso <= p.to);
+  const lab = (f, t) => fmtDate(f).replace(/ \d{4}$/, '') + ' – ' + fmtDate(t);
+  if (man) return {from: man.from, to: man.to, label: lab(man.from, man.to), manual: true};
+  const [y, m] = iso.split('-').map(Number), ends = [];
   for (let k = -2; k <= 2; k++){
     const dt = new Date(y, m - 1 + k, 1), yy = dt.getFullYear(), mm = dt.getMonth();
     (SD_RULES.cut && SD_RULES.cut.length ? SD_RULES.cut : [15, 31]).forEach(c => ends.push(isoOf(new Date(yy, mm, Math.min(c, dim(yy, mm))))));
   }
   ends.sort();
-  const to = ends.find(e => e >= iso), prev = ends.filter(e => e < iso).pop();
-  const from = addDays(prev, 1);
-  return {from, to, label: fmtDate(from).replace(/ \d{4}$/, '') + ' – ' + fmtDate(to)};
+  let to = ends.find(e => e >= iso), from = addDays(ends.filter(e => e < iso).pop(), 1);
+  // never overlap a manual cut-off
+  P.forEach(p => { if (p.to < iso && p.to >= from) from = addDays(p.to, 1); if (p.from > iso && p.from <= to) to = addDays(p.from, -1); });
+  return {from, to, label: lab(from, to)};
 }
-/** Salary deduction already used by this employee in the cut-off period of the date (sheet + not-yet-uploaded sales). */
-function creditUsed(emp, iso){
-  const p = cutoffOf(iso);
-  let used = 0;
-  ROWS.forEach(r => {
-    if (!r._date || r._date < p.from || r._date > p.to) return;
-    if (!(r.custCat === CAT.employee || /SALARY|DEDUC/i.test(r.custCat))) return;
-    const m = /EMP#\s*([^\s·|]+)/.exec(r.remarks || '');
-    const same = (emp.empNo && m && key(m[1]) === key(emp.empNo)) || findEmployee(r.customer) === emp;
-    if (same) used += r._amt;
-  });
-  return {used: r2(used), period: p};
+/** Cut-off periods from one date to another, in order. */
+function periodsBetween(fromIso, toIso){
+  const out = []; let p = cutoffOf(fromIso), guard = 0;
+  while (p.from <= toIso && guard++ < 200){ out.push(p); p = cutoffOf(addDays(p.to, 1)); }
+  return out;
 }
-/** Payroll groups found in the uploaded employee lists: [{k, label}] */
+
+/* ---------- payroll groups: only 3 categories ---------- */
+const PAY_GROUPS = [{k: 'RANKANDFILE', label: 'Rank & File'}, {k: 'SUPERVISORY', label: 'Supervisory'}, {k: 'MANAGERIAL', label: 'Managerial'}];
+/** Manager / Managerial / Consultant → MANAGERIAL · Protect / Supervisor / Supervisory → SUPERVISORY · Rank & File → RANKANDFILE */
+function payGroup(p){
+  const s = key(p);
+  if (/MANAGER|CONSULTANT/.test(s)) return 'MANAGERIAL';
+  if (/PROTECT|SUPERVIS/.test(s)) return 'SUPERVISORY';
+  if (/RANK/.test(s)) return 'RANKANDFILE';
+  return 'OTHER';
+}
+const payGroupLabel = k => (PAY_GROUPS.find(g => g.k === k) || {label: 'Other / blank'}).label;
 function payrollGroups(){
-  const m = new Map();
-  COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { const k = key(e.payroll) || 'BLANK'; if (!m.has(k)) m.set(k, String(e.payroll || '').trim() || '(no payroll group)'); }));
-  return [...m].map(([k, label]) => ({k, label})).sort((a, b) => a.label.localeCompare(b.label));
+  const other = COMPANIES.some(c => (LISTS.employees[c] || []).some(e => payGroup(e.payroll) === 'OTHER'));
+  return PAY_GROUPS.concat(other ? [{k: 'OTHER', label: 'Other / blank'}] : []);
 }
-/** Limit for this employee: business unit + payroll group, else the default. 0 = no limit. */
+/** Base limit for this employee: business unit + payroll group, else the default. 0 = no limit. */
 function limitFor(emp){
-  const k = (emp.company || '') + '|' + (key(emp.payroll) || 'BLANK'), L = SD_RULES.limits || {};
+  const k = (emp.company || '') + '|' + payGroup(emp.payroll), L = SD_RULES.limits || {};
   return L[k] !== undefined && L[k] !== '' ? num(L[k]) : num(SD_RULES.limit);
 }
+
+/* ---------- salary deduction ledger engine: purchases − payroll deductions = running balance per cut-off ---------- */
+let EMPNO_IDX = null, EMPNO_V = null;
+function empByNo(no){
+  if (EMPNO_V !== LISTS_V || !EMPNO_IDX){ EMPNO_IDX = new Map(); COMPANIES.forEach(c => (LISTS.employees[c] || []).forEach(e => { if (e.empNo) EMPNO_IDX.set(key(e.empNo), Object.assign(e, {company: e.company || c})); })); EMPNO_V = LISTS_V; }
+  return EMPNO_IDX.get(key(no)) || null;
+}
+const nameKey = n => (nameVariants(n).exact[0] || key(n));
+/** Who is this (sale row or deduction row)? → {id, emp, name} */
+function sdWho(name, empNo){
+  const emp = (empNo && empByNo(empNo)) || findEmployee(name);
+  return emp ? {id: 'E:' + (emp.empNo ? key(emp.empNo) : nameKey(emp.name)), emp, name: emp.name} : {id: 'N:' + nameKey(name), emp: null, name: String(name || '').trim()};
+}
+const isSdRow = r => r.custCat === CAT.employee || /SALARY|DEDUC/i.test(r.custCat);
+const sdStart = () => SD_RULES.balStart || DATA_SINCE || recentSince();
+let SD_MEMO = {k: '', v: null};
+/** Ledger from the balance start date up to the cut-off that contains `uptoIso`. */
+function sdLedger(uptoIso){
+  const memoK = [ROWS.length, LISTS_V, JSON.stringify(SD_RULES), uptoIso, OUTBOX.length, sdStart()].join('|');
+  if (SD_MEMO.k === memoK) return SD_MEMO.v;
+  const start = sdStart(), periods = periodsBetween(start, uptoIso);
+  const pidx = iso => periods.findIndex(p => iso >= p.from && iso <= p.to);
+  const people = new Map();
+  const person = w => { if (!people.has(w.id)) people.set(w.id, {id: w.id, emp: w.emp, name: w.name, company: w.emp ? w.emp.company : '', empNo: w.emp ? w.emp.empNo : '', group: w.emp ? payGroup(w.emp.payroll) : 'OTHER', purch: periods.map(() => 0), ded: periods.map(() => 0)}); return people.get(w.id); };
+  ROWS.forEach(r => {
+    if (!isSdRow(r) || !r._date) return;
+    const i = pidx(r._date); if (i < 0) return;
+    const m = /EMP#\s*([^\s·|]+)/.exec(r.remarks || ''), co = companyOf(r);
+    const pp = person(sdWho(r.customer, m ? m[1] : ''));
+    if (!pp.company && co) pp.company = co;
+    if (!pp.empNo && m) pp.empNo = m[1];
+    pp.purch[i] += r._amt;
+  });
+  const closed = periods.map(() => false);
+  (LISTS.deductions || []).forEach(d => {
+    const i = pidx(String(d.from || '')); if (i < 0) return;
+    closed[i] = true;
+    const pp = person(sdWho(d.name, d.empNo));
+    if (!pp.company && d.company) pp.company = d.company;
+    if (!pp.empNo && d.empNo) pp.empNo = d.empNo;
+    pp.ded[i] += num(d.amount);
+  });
+  people.forEach(pp => {
+    let bal = 0; pp.beg = []; pp.end = [];
+    periods.forEach((p, i) => { pp.beg[i] = r2(bal); bal = bal + pp.purch[i] - pp.ded[i]; pp.end[i] = r2(bal); });
+  });
+  const v = {start, periods, closed, people};
+  SD_MEMO = {k: memoK, v};
+  return v;
+}
+/** Credit for this employee on this date: base limit − unpaid balance carried from earlier (closed) cut-offs − purchases this cut-off. */
 function creditInfo(emp, iso){
   if (!emp || !iso) return null;
-  const limit = limitFor(emp);
-  if (!(limit > 0)) return null;
-  const u = creditUsed(emp, iso);
-  return {used: u.used, limit, left: r2(Math.max(0, limit - u.used)), period: u.period, reached: u.used >= limit - 0.005};
+  const base = limitFor(emp);
+  if (!(base > 0)) return null;
+  const L = sdLedger(iso), cur = L.periods.length - 1, period = L.periods[cur] || cutoffOf(iso);
+  const pp = L.people.get(sdWho(emp.name, emp.empNo).id);
+  let carried = 0;
+  if (pp) for (let i = cur - 1; i >= 0; i--) if (L.closed[i]) { carried = Math.max(0, pp.end[i]); break; }
+  const used = pp && cur >= 0 ? r2(pp.purch[cur]) : 0;
+  const limit = r2(Math.max(0, base - carried));
+  return {base, carried: r2(carried), limit, used, left: r2(Math.max(0, limit - used)), period, reached: used >= limit - 0.005};
 }
 function findEmployee(name){
   const v = nameVariants(name);
@@ -819,7 +891,7 @@ async function load(silent, fresh){
       d = c.d; fromCache = true; CACHE_AT = c.at;
       if (!LISTS.rates.length && c.lists) applyLists(c.lists);
     }
-    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}}, d.config.sdRules); }
+    if (d.config){ CAT = d.config.categories || CAT; SOURCE = d.config.source || SOURCE; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}, periods: [], balStart: ''}, d.config.sdRules); }
     ROWS = applyOverrides(d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); }), !fromCache);
     $('lnkSheet').href = d.url; $('lnkSheet').classList.remove('hidden');
     $('connectBox').classList.add('hidden');
@@ -900,7 +972,7 @@ function onCustomer(keepMode){
   else { badge = '✔ VERIFIED · ' + e.emp.company; cls = 'b-OK'; why = 'Emp# ' + (e.emp.empNo || '—') + (e.emp.dept ? ' · ' + e.emp.dept : '') + ' · regular since ' + fmtDate(toISO(e.emp.regular));
     const ci = creditInfo(e.emp, $('eDate').value);
     if (ci){
-      why += ' · ' + (e.emp.payroll || 'no payroll group') + ' limit · Credit ' + ci.period.label + ': used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' · ' + peso(ci.left) + ' left';
+      why += ' · ' + payGroupLabel(payGroup(e.emp.payroll)) + ' limit ' + peso(ci.base) + (ci.carried > 0 ? ' − unpaid balance ' + peso(ci.carried) + ' = ' + peso(ci.limit) : '') + ' · Credit ' + ci.period.label + ': used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' · ' + peso(ci.left) + ' left';
       if (ci.reached){ badge = '✖ CREDIT LIMIT REACHED · ' + e.emp.company; cls = 'b-NO'; }
     }
   }
@@ -998,7 +1070,7 @@ function buildRows(){
     if (verifyOn() && e.emp && e.regular){
       const ci = creditInfo(e.emp, date), tot = lines.reduce((a, v) => a + v.amount, 0);
       if (ci && r2(ci.used + tot) > ci.limit + 0.005)
-        errs.push('credit limit — ' + e.emp.name + ' has used ' + peso(ci.used) + ' of ' + peso(ci.limit) + ' for the ' + ci.period.label + ' cut-off; only ' + peso(ci.left) + ' left (this sale is ' + peso(tot) + ')');
+        errs.push('credit limit — ' + e.emp.name + ' has used ' + peso(ci.used) + ' of ' + peso(ci.limit) + (ci.carried > 0 ? ' (limit ' + peso(ci.base) + ' less unpaid balance ' + peso(ci.carried) + ')' : '') + ' for the ' + ci.period.label + ' cut-off; only ' + peso(ci.left) + ' left (this sale is ' + peso(tot) + ')');
     }
   }
   if (!lines.length) errs.push('at least one product line');
@@ -1283,15 +1355,19 @@ function saveLocalCopy(){
 function openLimits(){
   const groups = payrollGroups(), L = SD_RULES.limits || {};
   const def = num(SD_RULES.limit), cutNow = (SD_RULES.cut || [15, 31]).join(',');
-  const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => (key(e.payroll) || 'BLANK') === g).length;
+  const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => payGroup(e.payroll) === g).length;
   const presets = [['15,31','1–15 and 16–end of month'],['10,25','11–25 and 26–10'],['5,20','6–20 and 21–5'],['31','Monthly (1–end of month)']];
   if (!presets.some(p => p[0] === cutNow)) presets.push([cutNow, 'Cut-off days ' + cutNow.replace(',', ' & ')]);
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>💳 Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
     '<p class="hint" style="margin-top:0">Shared by all users. Checked when employee verification is ON: an employee who reaches the limit cannot avail more salary deduction until the next cut-off.' + (SD_RULES.updated ? ' Last changed ' + esc(SD_RULES.updated) + '.' : '') + '</p>' +
     '<div class="fgrid" style="margin-bottom:12px"><div><label>Default limit per employee per cut-off (₱, 0 = no limit)</label><input id="limDef" type="number" min="0" step="any" value="' + esc(def || 0) + '"></div>' +
-    '<div><label>Cut-off periods</label><select id="limCut">' + presets.map(([v, l]) => '<option value="' + v + '"' + (v === cutNow ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div></div>' +
+    '<div><label>Cut-off periods (regular)</label><select id="limCut">' + presets.map(([v, l]) => '<option value="' + v + '"' + (v === cutNow ? ' selected' : '') + '>' + l + '</option>').join('') + '<option value="custom">Other cut-off days…</option></select></div>' +
+    '<div><label>Balances start from</label><input id="limStart" type="date" value="' + esc(SD_RULES.balStart || '') + '"><span class="hint">Purchases and deductions before this date are not counted. Blank = ' + esc(fmtDate(DATA_SINCE || recentSince())) + '</span></div></div>' +
+    '<label>Manual cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— use these exact dates instead of the regular cut-off (e.g. a payroll period that moved)</span></label>' +
+    '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddP" type="button">+ Add cut-off dates</button>' +
+    '<div style="height:12px"></div>' +
     (groups.length
-      ? '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— blank = use the default · 0 = no limit · small number = employees in that group</span></label>' +
+      ? '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— blank = use the default · 0 = no limit · small number = employees in that group · Managerial = Manager, Managerial, Consultant · Supervisory = Protect, Supervisor, Supervisory · Rank &amp; File = Rank &amp; File, Rank and File · an unpaid balance lowers the individual employee\'s limit</span></label>' +
         '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
         COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
           const k = c + '|' + g.k, n = cnt(c, g.k);
@@ -1306,16 +1382,160 @@ function openLimits(){
     const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = default):', ''); if (v === null) return;
     $('modalRoot').querySelectorAll('[data-lim$="|' + b.dataset.fill + '"]').forEach(i => i.value = v.trim());
   });
+  const addP = (f, t) => { const d = document.createElement('div'); d.style.cssText = 'display:flex;gap:6px;align-items:center';
+    d.innerHTML = '<span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
+    d.querySelector('button').onclick = () => d.remove(); $('limPeriods').appendChild(d); };
+  (SD_RULES.periods || []).forEach(p => addP(p.from, p.to));
+  $('limAddP').onclick = () => addP('', '');
+  $('limCut').onchange = () => {
+    if ($('limCut').value !== 'custom') return;
+    const v = prompt('Cut-off days of the month, e.g. "15, 30" (two days) or "25" (monthly). 31 = end of month:', '');
+    const d = (v || '').split(/[^\d]+/).map(Number).filter(x => x >= 1 && x <= 31).slice(0, 2);
+    if (!d.length){ $('limCut').value = cutNow; return; }
+    const val = d.sort((a, b) => a - b).join(',');
+    if (![...$('limCut').options].some(o => o.value === val)) $('limCut').insertAdjacentHTML('afterbegin', '<option value="' + val + '">Cut-off days ' + val.replace(',', ' & ') + '</option>');
+    $('limCut').value = val;
+  };
   $('limSave').onclick = async () => {
     if (needOnline('Saving the credit limits')) return;
     const limits = {};
     $('modalRoot').querySelectorAll('[data-lim]').forEach(i => { if (i.value.trim() !== '') limits[i.dataset.lim] = num(i.value); });
     $('limSave').disabled = true;
     try {
-      SD_RULES = await api('saveSdRules', {limit: num($('limDef').value), cut: $('limCut').value.split(',').map(Number), limits});
-      $('modalRoot').innerHTML = ''; onCustomer(true);
+      const periods = [...$('limPeriods').children].map(d => ({from: d.querySelector('[data-pf]').value, to: d.querySelector('[data-pt]').value})).filter(p => p.from && p.to);
+      if (periods.some(p => p.from > p.to)) { $('limSave').disabled = false; return toast('A manual cut-off has "from" after "to".', true); }
+      SD_RULES = await api('saveSdRules', {limit: num($('limDef').value), cut: $('limCut').value.split(',').map(Number), limits, periods, balStart: $('limStart').value});
+      $('modalRoot').innerHTML = ''; onCustomer(true); if (summaryVisible()) fillSdCuts();
       toast('Credit limits saved for all users ✓ — default ' + (SD_RULES.limit ? peso(SD_RULES.limit) : 'no limit') + (Object.keys(limits).length ? ' · ' + Object.keys(limits).length + ' group limit(s)' : ''));
     } catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
+  };
+}
+
+/* ================= SALARY DEDUCTION LEDGER ================= */
+function fillSdCuts(){
+  const sel = $('sdCut'); if (!sel) return;
+  const cur = sel.value, today = todayISO();
+  const ps = periodsBetween(sdStart(), today).reverse();
+  const L = sdLedger(today);
+  sel.innerHTML = ps.map(p => { const i = L.periods.findIndex(x => x.from === p.from); return '<option value="' + p.from + '|' + p.to + '">' + esc(p.label) + (i >= 0 && L.closed[i] ? ' ✓ deducted' : '') + '</option>'; }).join('');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+}
+function sdLedgerHtml(from, to, filter){
+  const s = settings(), L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
+  if (i < 0) return '<p class="hint">This cut-off is before the balance start date.</p>';
+  const p = L.periods[i], closed = L.closed[i];
+  const up = (LISTS.deductions || []).find(d => d.from === p.from);
+  let list = [...L.people.values()].filter(x => x.beg[i] || x.purch[i] || x.ded[i] || x.end[i]);
+  if (filter && filter.co) list = list.filter(x => x.company === filter.co);
+  if (filter && filter.q) list = list.filter(x => (x.name + ' ' + x.empNo).toLowerCase().includes(filter.q));
+  list.sort((a, b) => (a.company || 'ZZ').localeCompare(b.company || 'ZZ') || a.name.localeCompare(b.name));
+  const T = list.reduce((t, x) => { t.beg += x.beg[i]; t.pur += x.purch[i]; t.ded += x.ded[i]; t.end += x.end[i]; return t; }, {beg: 0, pur: 0, ded: 0, end: 0});
+  const M = v => v ? money(v) : '-';
+  return '<div class="ledger">' +
+    '<div class="sh"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""><div><b>' + esc(s.company) + '</b>' + esc(s.address) + '</div></div>' +
+    '<h2>SALARY DEDUCTION LEDGER</h2><div class="sub">Cut-off <b>' + esc(longDate(p.from)) + ' – ' + esc(longDate(p.to)) + '</b>' + (p.manual ? ' (manual dates)' : '') + ' · ' +
+      (closed ? 'payroll deductions uploaded ' + esc(up && up.uploaded || '') : '<span style="color:#a35400">payroll deductions not uploaded yet</span>') + (filter && filter.co ? ' · ' + esc(filter.co) : '') + '</div>' +
+    '<div class="boxes" style="grid-template-columns:repeat(5,1fr)"><div><span>Employees</span><b>' + list.length + '</b></div><div><span>Beginning balance</span><b>₱' + money(T.beg) + '</b></div><div><span>Purchases this cut-off</span><b>₱' + money(T.pur) + '</b></div><div><span>Deducted (payroll)</span><b>₱' + money(T.ded) + '</b></div><div><span>Remaining balance</span><b>₱' + money(T.end) + '</b></div></div>' +
+    '<table><thead><tr><th style="width:24px">#</th><th>Business unit</th><th>Emp. No.</th><th>Employee</th><th>Group</th><th class="n">Beginning bal.</th><th class="n">Purchases</th><th class="n">Deducted</th><th class="n">Remaining bal.</th><th class="n">Limit next</th></tr></thead><tbody>' +
+      (list.length ? list.map((x, n) => {
+        const base = x.emp ? limitFor(x.emp) : 0;
+        const nextLim = base > 0 ? r2(Math.max(0, base - Math.max(0, closed ? x.end[i] : 0))) : null;
+        return '<tr' + (x.end[i] > 0.005 ? ' class="owe"' : '') + '><td>' + (n + 1) + '</td><td>' + esc(x.company || '—') + '</td><td>' + esc(x.empNo || '') + '</td><td><b>' + esc(x.name) + '</b>' + (x.emp ? '' : ' <span class="hint">(not in list)</span>') + '</td><td>' + esc(payGroupLabel(x.group)) + '</td>' +
+          '<td class="n">' + M(x.beg[i]) + '</td><td class="n">' + M(x.purch[i]) + '</td><td class="n">' + M(x.ded[i]) + '</td><td class="n"><b>' + M(x.end[i]) + '</b></td><td class="n">' + (nextLim === null ? '—' : money(nextLim)) + '</td></tr>';
+      }).join('') : '<tr><td colspan="10" style="text-align:center;padding:14px;color:#777">No salary deduction activity in this cut-off.</td></tr>') +
+      '<tr class="tot"><td colspan="5" style="text-align:right">TOTAL</td><td class="n">' + money(T.beg) + '</td><td class="n">' + money(T.pur) + '</td><td class="n">' + money(T.ded) + '</td><td class="n">' + money(T.end) + '</td><td></td></tr></tbody></table>' +
+    '<div class="hint" style="margin-top:6px;color:#555">Remaining balance = beginning balance + purchases − payroll deduction. Balances count from ' + esc(fmtDate(L.start)) + '. "Limit next" = the employee\'s credit limit for the next cut-off after the unpaid balance is taken off (only once the deductions of this cut-off are uploaded).</div>' +
+    '<div class="sig3"><div>Prepared by</div><div>Checked by</div><div>Noted by (Payroll)</div></div>' +
+    '<div class="foot"><span>Sales Meat &amp; Livestock · salary deduction</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
+  '</div>';
+}
+function openSdLedger(){
+  const v = $('sdCut').value; if (!v) return toast('No cut-off to show yet.', true);
+  const [from, to] = v.split('|');
+  if (from < DATA_SINCE) return toast('This cut-off is older than the loaded data — click "All" in the period buttons first.', true);
+  const f = {co: '', q: ''};
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>📒 Salary deduction ledger</h3>' +
+    '<select id="sdCo" style="width:auto"><option value="">All business units</option>' + COMPANIES.map(c => '<option>' + c + '</option>').join('') + '</select>' +
+    '<input id="sdQ" placeholder="Search employee…" style="width:180px">' +
+    '<button class="btn sm" id="sdCsv">Export CSV</button>' +
+    '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
+    '<div class="slipwrap" id="sdWrap"></div></div></div>';
+  const draw = () => { $('sdWrap').innerHTML = sdLedgerHtml(from, to, f); };
+  draw();
+  $('sdCo').onchange = () => { f.co = $('sdCo').value; draw(); };
+  $('sdQ').oninput = () => { f.q = $('sdQ').value.trim().toLowerCase(); draw(); };
+  $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
+  $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + sdLedgerHtml(from, to, f) + '</div>'; setTimeout(() => window.print(), 50); };
+  $('sdCsv').onclick = () => {
+    const L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
+    const q = x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
+    const rows = [...L.people.values()].filter(x => (x.beg[i] || x.purch[i] || x.ded[i] || x.end[i]) && (!f.co || x.company === f.co));
+    const lines = [['Cut-off from','Cut-off to','Business unit','Employee No.','Employee','Group','Beginning balance','Purchases','Deducted','Remaining balance'].join(',')]
+      .concat(rows.map(x => [from, to, x.company, x.empNo, x.name, payGroupLabel(x.group), r2(x.beg[i]), r2(x.purch[i]), r2(x.ded[i]), r2(x.end[i])].map(q).join(',')));
+    download('salary-deduction-ledger-' + from + '.csv', '﻿' + lines.join('\n'), 'text/csv');
+  };
+}
+/* ---------- upload the payroll's list of deducted employees ---------- */
+const DED_AMT = ['AMOUNTDEDUCTED','DEDUCTIONAMOUNT','DEDUCTEDAMOUNT','TOTALDEDUCTION','DEDUCTION','DEDUCTED','AMOUNT','TOTAL','NETAMOUNT'];
+function parseDeductGrid(grid){
+  let best = null;
+  for (let i = 0; i < Math.min(grid.length, 40); i++){
+    const row = grid[i] || [], m = empHeaderMap(row);
+    const hasName = m.name !== undefined || (m.last !== undefined && m.first !== undefined);
+    let a = -1;
+    for (const al of DED_AMT){ a = row.findIndex((h, j) => key(h) && (key(h) === al || key(h).includes(al)) && !Object.values(m).includes(j)); if (a >= 0) break; }
+    const coI = row.findIndex(h => /^(COMPANY|BUSINESSUNIT|BU|COMPANYNAME)$/.test(key(h)));
+    if ((hasName || m.empNo !== undefined) && a >= 0){ best = {i, m, a, coI}; break; }
+  }
+  if (!best) return null;
+  const out = [];
+  for (let r = best.i + 1; r < grid.length; r++){
+    const row = grid[r] || [], g = f => best.m[f] === undefined ? '' : row[best.m[f]];
+    let name = String(g('name') || '').trim();
+    if (!name && best.m.last !== undefined){ const l = String(g('last') || '').trim(), f2 = String(g('first') || '').trim(); if (l && f2) name = l + ', ' + f2; }
+    const empNo = String(g('empNo') || '').trim(), amount = r2(num(row[best.a]));
+    if ((!name && !empNo) || !(amount > 0) || /^TOTAL/i.test(name)) continue;
+    const w = sdWho(name, empNo);
+    out.push({company: (best.coI >= 0 ? String(row[best.coI] || '').trim().toUpperCase() : '') || (w.emp ? w.emp.company : ''), empNo: empNo || (w.emp ? w.emp.empNo : ''), name: name || (w.emp ? w.emp.name : ''), amount, matched: !!w.emp});
+  }
+  return out;
+}
+function openSdUpload(){
+  if (needOnline('Uploading the deductions')) return;
+  const v = $('sdCut').value; if (!v) return toast('Choose the cut-off first.', true);
+  const [from, to] = v.split('|');
+  const had = (LISTS.deductions || []).filter(d => d.from === from && d.to === to);
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>⬆ Deducted employees · ' + esc(cutoffOf(from).label) + '</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
+    '<p class="hint" style="margin-top:0">Upload the payroll file (Excel or CSV) with the employees deducted for this cut-off. Columns: <b>Employee No.</b> and/or <b>Employee Name</b>, and <b>Amount deducted</b> (Company is optional). ' +
+    'Uploading replaces this cut-off\'s list' + (had.length ? ' (now ' + had.length + ' employees, ' + peso(had.reduce((a, d) => a + num(d.amount), 0)) + ')' : '') + '.</p>' +
+    '<input type="file" id="sdFile" accept=".xlsx,.xls,.csv"><div id="sdPrev" style="margin-top:10px"></div></div>' +
+    '<div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="sdSave" disabled>Save deductions</button></div></div></div>';
+  $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
+  let rows = null;
+  $('sdFile').onchange = async e => {
+    const file = e.target.files[0]; if (!file) return;
+    $('sdPrev').innerHTML = '<p class="hint">Reading…</p>';
+    try {
+      await needXLSX();
+      const wb = XLSX.read(new Uint8Array(await readFile(file)), {type: 'array', cellDates: true});
+      rows = null;
+      for (const n of wb.SheetNames){ const r = parseDeductGrid(XLSX.utils.sheet_to_json(wb.Sheets[n], {header: 1, raw: true, defval: ''})); if (r && r.length && (!rows || r.length > rows.length)) rows = r; }
+      if (!rows) throw new Error('Could not find the columns. The file needs Employee No. or Employee Name, and an Amount / Deduction column.');
+      const unmatched = rows.filter(r => !r.matched).length;
+      $('sdPrev').innerHTML = '<p><b>' + rows.length + '</b> employees · total <b>' + peso(rows.reduce((a, r) => a + r.amount, 0)) + '</b>' + (unmatched ? ' · <span style="color:#a35400">' + unmatched + ' not found in the Employees list (kept by name)</span>' : '') + '</p>' +
+        '<div class="tablewrap" style="max-height:40vh"><table><thead><tr><th>BU</th><th>Emp. No.</th><th>Employee</th><th class="n">Deducted</th></tr></thead><tbody>' +
+        rows.slice(0, 500).map(r => '<tr><td>' + esc(r.company) + '</td><td>' + esc(r.empNo) + '</td><td>' + esc(r.name) + (r.matched ? '' : ' <span class="hint">(not in list)</span>') + '</td><td class="n">' + money(r.amount) + '</td></tr>').join('') + '</tbody></table></div>';
+      $('sdSave').disabled = false;
+    } catch (err){ $('sdPrev').innerHTML = '<p style="color:#a01c1c">' + esc(err.message || err) + '</p>'; }
+  };
+  $('sdSave').onclick = async () => {
+    if (!rows) return;
+    $('sdSave').disabled = true; $('sdSave').textContent = 'Saving…';
+    try {
+      applyLists(await api('saveDeductions', from, to, rows.map(r => ({company: r.company, empNo: r.empNo, name: r.name, amount: r.amount}))));
+      $('modalRoot').innerHTML = ''; fillSdCuts(); onCustomer(true);
+      toast('Deductions saved for ' + cutoffOf(from).label + ' ✓ — balances and credit limits updated');
+    } catch (err){ toast('Could not save: ' + (err.message || err), true); $('sdSave').disabled = false; $('sdSave').textContent = 'Save deductions'; }
   };
 }
 
@@ -1550,6 +1770,7 @@ function fillSummaryFilters(){
 }
 function summaryVisible(){ return !$('tab-summary').classList.contains('hidden'); }
 function renderSummary(){
+  try { fillSdCuts(); } catch(e){ console.warn(e); }
   const f = {from:$('sFrom').value, to:$('sTo').value, rep:$('sRep').value, cat:$('sCat').value, prod:$('sProd').value};
   const v = ROWS.filter(r => (!f.from || r._date >= f.from) && (!f.to || r._date <= f.to) && (!f.rep || r.rep === f.rep) && (!f.cat || r.custCat === f.cat) && (!f.prod || r._prod === f.prod));
   const tot = v.reduce((a, r) => a + r._amt, 0), kg = v.reduce((a, r) => a + r._kg, 0);
@@ -1865,6 +2086,8 @@ $('btnDailyCsv').onclick = exportDaily;
 $('dailyTable').addEventListener('click', e => { const tr = e.target.closest('tr[data-day]'); if (tr) openDayDetail(tr.dataset.day); });
 $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
+$('btnSdLedger').onclick = openSdLedger;
+$('btnSdUpload').onclick = openSdUpload;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
 $('eLimitsBtn').onclick = openLimits;
