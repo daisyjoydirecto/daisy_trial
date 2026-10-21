@@ -33,6 +33,14 @@
   .tab.active{background:var(--lime);border-color:var(--lime);color:var(--black);font-weight:700}
   .net{font-size:max(10px, calc(12px * var(--fs)));padding:5px 10px;border-radius:3px;white-space:nowrap;border:1px solid #3a3a3a}
   .net.on{color:var(--lime)}.net.off{background:var(--amber);border-color:var(--amber);color:#1a1a1a;font-weight:700}
+  #btnRefresh.syncing{background:#eef4ff;color:#1f4fa8;border-color:#b9cdf5}
+  #btnRefresh.sync-ok{background:#2e7d32;color:#fff;border-color:#2e7d32}
+  #btnRefresh.sync-err{background:#c62828;color:#fff;border-color:#c62828}
+  .spin.sm{display:inline-block;width:11px;height:11px;border:2px solid #b9cdf5;border-top-color:#1f4fa8;border-radius:50%;animation:spin .8s linear infinite;vertical-align:-1px}
+  .syncnote{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:120;display:flex;gap:10px;align-items:center;padding:11px 16px;border-radius:4px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.25);max-width:min(760px,94vw);font-size:max(12px, calc(14px * var(--fs)))}
+  .syncnote.ok{background:#eaf6e4;color:#1e5e22;border:2px solid #2e7d32}
+  .syncnote.err{background:#fdecec;color:#8a1616;border:2px solid #c62828}
+  .syncnote button{background:none;border:0;cursor:pointer;font-size:16px;color:inherit;margin-left:6px}
   #btnRefresh.pending{background:var(--amber);color:#1a1a1a;border-color:var(--amber)}
   .pend{font-size:max(10px, calc(11px * var(--fs)));font-weight:700;color:#7a4b00;background:#fdf0d9;border:1px solid #f3cf93;border-radius:3px;padding:1px 6px}
   /* ---------- buttons ---------- */
@@ -884,6 +892,7 @@ function updateNet(){
   $('netPill').textContent = ONLINE ? '● Online' : '● Offline';
   $('netPill').className = 'net ' + (ONLINE ? 'on' : 'off');
   $('netPill').title = ONLINE ? 'Connected to the Google Sheet' : 'No internet — sales are kept on this device until you click Sync';
+  if (SYNC_BUSY || $('btnRefresh').classList.contains('sync-ok') || $('btnRefresh').classList.contains('sync-err')) return;
   $('btnRefresh').textContent = '⟳ Sync' + (n ? ' (' + n + ')' : '');
   $('btnRefresh').classList.toggle('pending', n > 0);
 }
@@ -926,11 +935,39 @@ async function doUpload(quiet){
   if (reload && quiet) load(true);
   return ok;
 }
+var SYNC_BUSY = false, SYNC_FLASH = 0;
 async function syncNow(){
-  const btn = $('btnRefresh'); btn.disabled = true;
-  try { if (UPLOADING) await UPLOADING; await uploadOutbox(false); }
-  finally { btn.disabled = false; updateNet(); }
-  await load(true, true);   // ⟳ Sync also re-reads the sheet and lists (shows edits made directly in the sheet)
+  if (SYNC_BUSY) return;
+  const btn = $('btnRefresh'); SYNC_BUSY = true; btn.disabled = true;
+  btn.classList.remove('sync-ok', 'sync-err'); btn.classList.add('syncing');
+  btn.innerHTML = '<span class="spin sm"></span> Syncing…';
+  const waiting = OUTBOX.length;
+  let uploaded = 0, res = 'error';
+  try {
+    if (UPLOADING) await UPLOADING;
+    uploaded = await uploadOutbox(false) || 0;
+    res = await load(true, true);   // ⟳ Sync also re-reads the sheet and lists (shows edits made directly in the sheet)
+  } catch (e){ LOAD_ERR = e.message || String(e); res = 'error'; }
+  SYNC_BUSY = false; btn.disabled = false; btn.classList.remove('syncing');
+  const left = OUTBOX.length, at = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+  const ok = res === 'ok' && !left;
+  btn.classList.add(ok ? 'sync-ok' : 'sync-err');
+  btn.innerHTML = ok ? '✔ Synced' : '✖ Not synced';
+  syncNote(ok, ok
+    ? 'Synced successfully at ' + at + (waiting ? ' — ' + uploaded + ' sale(s) uploaded' : '') + ' · data and lists refreshed from the Google Sheet'
+    : (res === 'offline' ? 'Sync failed — no internet connection.' : res === 'error' ? 'Sync failed — ' + (LOAD_ERR || 'could not reach the Google Sheet') + '.' : 'Data refreshed') +
+      (left ? ' ' + left + ' sale(s) still waiting on this computer — click ⟳ Sync again when the connection is back.' : ''));
+  clearTimeout(SYNC_FLASH);
+  SYNC_FLASH = setTimeout(() => { btn.classList.remove('sync-ok', 'sync-err'); updateNet(); }, ok ? 4000 : 8000);
+}
+/** Clear result message under the header after Sync (stays a few seconds). */
+function syncNote(ok, text){
+  let n = $('syncNote');
+  if (!n){ n = document.createElement('div'); n.id = 'syncNote'; document.body.appendChild(n); }
+  n.className = 'syncnote ' + (ok ? 'ok' : 'err');
+  n.innerHTML = '<b>' + (ok ? '✔' : '✖') + '</b> <span>' + esc(text) + '</span><button type="button" aria-label="Close">✕</button>';
+  n.querySelector('button').onclick = () => n.remove();
+  clearTimeout(n._t); n._t = setTimeout(() => n.remove(), ok ? 5000 : 12000);
 }
 
 /* ================= data load ================= */
@@ -956,7 +993,7 @@ async function load(silent, fresh){
       if (!err.offline) throw err;
       setOnline(false);
       const c = await IDB.get('cache').catch(() => null);
-      if (!c){ $('status').textContent = 'Offline — no saved copy yet'; toast('No internet, and this device has no saved copy yet. Open the dashboard once while online.', true); return; }
+      if (!c){ $('status').textContent = 'Offline — no saved copy yet'; toast('No internet, and this device has no saved copy yet. Open the dashboard once while online.', true); return 'offline'; }
       d = c.d; fromCache = true; CACHE_AT = c.at;
       if (!LISTS.rates.length && c.lists) applyLists(c.lists);
     }
@@ -984,12 +1021,16 @@ async function load(silent, fresh){
     $('status').textContent = fromCache ? 'OFFLINE · showing data saved ' + t(CACHE_AT) + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '')
       : ROWS.length.toLocaleString() + ' sales lines' + (DATA_SINCE ? ' since ' + fmtDate(DATA_SINCE) : ' (all history)') + ' · updated ' + new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) +
         (LAST_MS ? ' · ' + (LAST_MS / 1000).toFixed(1) + 's' : '') + (OUTBOX.length ? ' · ' + OUTBOX.length + ' sale(s) waiting to sync' : '');
+    return fromCache ? 'offline' : 'ok';
   } catch (e){
     $('status').textContent = 'Error loading';
     const msg = e.message || String(e);
+    LOAD_ERR = msg;
     if (!HAS_GAS) showConnect(msg); else toast('Error: ' + msg, true);
+    return 'error';
   }
 }
+let LOAD_ERR = '';
 /** First run only: fill the shared lists from (1) this browser's old lists, (2) the old sheet tabs, or (3) sales history. */
 let initDone = false;
 async function initLists(legacy){
