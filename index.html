@@ -485,7 +485,7 @@
           </div>
           <div class="hint" style="margin-top:6px">Uploading replaces that company's list for all users. Saved in the hidden Employees tab of the Google Sheet.</div>
         </div>
-        <div class="toolbar"><input id="eSearch" placeholder="Search employee…" style="max-width:260px"><span id="eInfo" class="hint"></span><span style="flex:1"></span><button class="btn sm" id="eStAll" title="Set the Employee Status of all employees shown">Set status of shown…</button><button class="btn primary sm hidden" id="eStSave">Save status changes</button><button class="btn sm" id="eClearComp">Remove this company's list</button></div>
+        <div class="toolbar"><input id="eSearch" placeholder="Search employee…" style="max-width:260px"><span id="eInfo" class="hint"></span><span style="flex:1"></span><button class="btn sm" id="eClearComp">Remove this company's list</button></div>
         <div class="tablewrap" style="max-height:56vh"><table id="empTable"></table></div>
       </div>
     </div>
@@ -2052,15 +2052,6 @@ async function seedList(){
 }
 
 /* ---------- employees ---------- */
-/* Employee Status can be set here (Regular / Probationary / Contractual …) and saved for all users */
-const EMP_STATUSES = ['Regular', 'Probationary', 'Contractual', 'Project-based', 'Resigned'];
-let EMP_ST_EDIT = {};   // empNo|name → new status (not saved yet)
-const empKey = e => (e.empNo || '') + '|' + key(e.name);
-function statusSel(e){
-  const k = empKey(e), cur = EMP_ST_EDIT[k] !== undefined ? EMP_ST_EDIT[k] : (e.status || '');
-  const opts = [''].concat(EMP_STATUSES, cur && !EMP_STATUSES.includes(cur) ? [cur] : []);
-  return '<select class="stsel' + (EMP_ST_EDIT[k] !== undefined ? ' changed' : '') + (isRegularStatus(cur) ? ' reg' : '') + '" data-emp="' + esc(k) + '">' + opts.map(o => '<option value="' + esc(o) + '"' + (o === cur ? ' selected' : '') + '>' + (o ? esc(o) : '— none —') + '</option>').join('') + '</select>';
-}
 function renderEmployees(){
   $('compTabs').innerHTML = COMPANIES.map(c => '<div class="ltab sm' + (c === EMPCOMP ? ' active' : '') + '" data-c="' + c + '">' + c + ' <span style="opacity:.7">(' + (LISTS.employees[c] || []).length + ')</span></div>').join('');
   $('upComp').innerHTML = COMPANIES.map(c => '<option' + (c === EMPCOMP ? ' selected' : '') + '>' + c + '</option>').join('');
@@ -2068,22 +2059,8 @@ function renderEmployees(){
   const shown = list.filter(e => !q || [e.empNo, e.name, e.position, e.dept, e.payroll].join(' ').toLowerCase().includes(q));
   $('eInfo').textContent = shown.length + ' of ' + list.length + (LISTS.empUpdated[EMPCOMP] ? ' · uploaded ' + LISTS.empUpdated[EMPCOMP] : ' · no list uploaded yet');
   $('empTable').innerHTML = '<thead><tr><th>Employee No.</th><th>Employee Name</th><th>Position</th><th>Department</th><th>Payroll Group</th><th>Date Hired</th><th>Date of Regularization</th><th>Employee Status</th></tr></thead><tbody>' +
-    (shown.length ? shown.slice(0, 1000).map(e => '<tr><td>' + esc(e.empNo) + '</td><td><b>' + esc(e.name) + '</b></td><td>' + esc(e.position) + '</td><td>' + esc(e.dept) + '</td><td>' + esc(e.payroll) + '</td><td>' + esc(fmtDate(e.hired)) + '</td><td>' + esc(fmtDate(e.regular)) + '</td><td>' + statusSel(e) + '</td></tr>').join('')
+    (shown.length ? shown.slice(0, 1000).map(e => '<tr><td>' + esc(e.empNo) + '</td><td><b>' + esc(e.name) + '</b></td><td>' + esc(e.position) + '</td><td>' + esc(e.dept) + '</td><td>' + esc(e.payroll) + '</td><td>' + esc(fmtDate(e.hired)) + '</td><td>' + esc(fmtDate(e.regular)) + '</td><td' + (isRegularStatus(e.status) ? ' style="color:#2e7d32;font-weight:700"' : '') + '>' + (e.status ? esc(e.status) : '<span class="hint">—</span>') + '</td></tr>').join('')
       : '<tr><td colspan="8" class="muted" style="padding:18px;text-align:center">No employees for ' + EMPCOMP + ' yet — upload the list above.</td></tr>') + '</tbody>';
-  const n = Object.keys(EMP_ST_EDIT).length;
-  $('eStSave').classList.toggle('hidden', !n); $('eStSave').textContent = 'Save status changes (' + n + ')';
-}
-async function saveEmpStatus(){
-  if (needOnline('Saving employee status')) return;
-  const list = (LISTS.employees[EMPCOMP] || []).map(e => { const k = empKey(e); return EMP_ST_EDIT[k] !== undefined ? Object.assign({}, e, {status: EMP_ST_EDIT[k]}) : e; });
-  $('eStSave').disabled = true; $('eStSave').textContent = 'Saving…';
-  try {
-    applyLists(await api('saveEmployees', {[EMPCOMP]: list}));
-    const kept = (LISTS.employees[EMPCOMP] || []).some(e => e.status);
-    EMP_ST_EDIT = {}; buildIndex(); onCustomer(true); renderEmployees(); renderLtabs();
-    toast(kept ? 'Employee Status saved for ' + EMPCOMP + ' ✓' : 'Employee Status was NOT saved — deploy Code.gs v22 or newer as a New version.', !kept);
-  } catch (e){ toast('Could not save: ' + (e.message || e), true); }
-  $('eStSave').disabled = false;
 }
 function xlDate(v){
   if (typeof v === 'number' && v > 20000 && v < 80000) return isoOf(new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4));
@@ -2246,23 +2223,7 @@ $('btnSdLedger').onclick = openSdLedger;
 $('btnSdUpload').onclick = openSdUpload;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
-$('empTable').addEventListener('change', e => {
-  const sel = e.target.closest('[data-emp]'); if (!sel) return;
-  const emp = (LISTS.employees[EMPCOMP] || []).find(x => empKey(x) === sel.dataset.emp);
-  if (emp && sel.value === (emp.status || '')) delete EMP_ST_EDIT[sel.dataset.emp]; else EMP_ST_EDIT[sel.dataset.emp] = sel.value;
-  renderEmployees();
-});
-$('eStSave').onclick = saveEmpStatus;
-$('eStAll').onclick = () => {
-  const q = $('eSearch').value.trim().toLowerCase();
-  const shown = (LISTS.employees[EMPCOMP] || []).filter(e => !q || [e.empNo, e.name, e.position, e.dept, e.payroll].join(' ').toLowerCase().includes(q));
-  if (!shown.length) return;
-  const v = prompt('Set the Employee Status of the ' + shown.length + ' employee(s) shown to:\n(' + EMP_STATUSES.join(' / ') + ')', 'Regular');
-  if (v === null) return;
-  const val = EMP_STATUSES.find(x => x.toLowerCase() === v.trim().toLowerCase()) || v.trim();
-  shown.forEach(e => { if ((e.status || '') !== val) EMP_ST_EDIT[empKey(e)] = val; else delete EMP_ST_EDIT[empKey(e)]; });
-  renderEmployees();
-};
+
 $('eLimitsBtn').onclick = openLimits;
 // text size: 50% (default) · 75% · 100% — remembered on this computer
 const FS_STEPS = [0.5, 0.75, 1];
@@ -2349,8 +2310,8 @@ $('lTable').addEventListener('change', e => { const el = e.target; if (el.tagNam
 $('lTable').addEventListener('click', e => { const b = e.target.closest('[data-rmi]'); if (b){ LEDIT.rows.splice(+b.dataset.rmi, 1); setDirty(true); renderList(); } });
 $('lSave').onclick = saveList;
 $('lSeed').onclick = seedList;
-$('compTabs').addEventListener('click', e => { const t = e.target.closest('[data-c]'); if (t){ if (Object.keys(EMP_ST_EDIT).length && !confirm('Discard the unsaved Employee Status changes?')) return; EMP_ST_EDIT = {}; EMPCOMP = t.dataset.c; $('eSearch').value = ''; renderEmployees(); } });
-$('upComp').addEventListener('change', () => { EMP_ST_EDIT = {}; EMPCOMP = $('upComp').value; renderEmployees(); });
+$('compTabs').addEventListener('click', e => { const t = e.target.closest('[data-c]'); if (t){ EMPCOMP = t.dataset.c; $('eSearch').value = ''; renderEmployees(); } });
+$('upComp').addEventListener('change', () => { EMPCOMP = $('upComp').value; renderEmployees(); });
 $('eSearch').addEventListener('input', renderEmployees);
 $('upFile').addEventListener('change', async e => {
   const f = e.target.files[0]; if (!f) return;
