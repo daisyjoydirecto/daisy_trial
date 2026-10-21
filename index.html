@@ -129,6 +129,8 @@
   .daily thead th{color:#fff;text-transform:none;letter-spacing:.02em;font-size:max(10.4px, calc(13px * var(--fs)));text-align:center;font-weight:700}
   .daily .hAll{background:#1a1a1a}.daily .hCash{background:var(--olive)}.daily .hCred{background:#b45309}
   .daily td{text-align:right;font-family:var(--mono)}.daily td.l{text-align:left;font-family:var(--serif)}
+  .daily tr.clk{cursor:pointer}
+  .daily tr.clk:hover td{background:#f6fbe8}
   .daily tr.tot td{background:var(--soft);font-weight:700}
   .daily tr.avg td{background:#f2f2f2;font-weight:700}
   .daily tr.shr td{background:#fafafa;font-weight:700}
@@ -289,6 +291,7 @@
     <span class="fsz" title="Text size"><button class="btn ghost" data-fs="-1">A−</button><button class="btn ghost" data-fs="0" id="fsLabel">50%</button><button class="btn ghost" data-fs="1">A+</button></span>
     <span class="net on" id="netPill">● Online</span>
     <button class="btn ghost" id="btnRefresh" title="Upload sales saved offline and reload from the Google Sheet">⟳ Sync</button>
+    <button class="btn ghost" id="btnTrash" title="Trash — deleted lines can be restored">🗑</button>
     <button class="btn ghost" id="btnSettings" title="Settings">⚙</button>
     <a class="btn ghost hidden" id="lnkSheet" target="_blank" style="text-decoration:none">Sheet ↗</a>
   </div>
@@ -1208,6 +1211,44 @@ function saveLocalCopy(){
     return IDB.set('cache', c);
   }).catch(() => {});
 }
+/* ================= TRASH BIN ================= */
+async function openTrash(){
+  if (needOnline('The Trash')) return;
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>🗑 Trash — deleted lines</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body" id="trBody"><p class="hint">Loading…</p></div></div></div>';
+  $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
+  let items = [];
+  try { items = await api('listTrash'); }
+  catch (e){ $('trBody').innerHTML = '<p class="hint">Could not open the Trash: ' + esc(e.message || e) + '</p>'; return; }
+  const draw = () => {
+    if (!items.length){ $('trBody').innerHTML = '<p class="hint" style="padding:20px;text-align:center">The Trash is empty.</p>'; return; }
+    $('trBody').innerHTML =
+      '<div class="toolbar" style="margin-bottom:8px"><label style="display:flex;gap:6px;align-items:center;margin:0;text-transform:none;letter-spacing:0"><input type="checkbox" id="trAll" style="width:auto"> Select all</label><span style="flex:1"></span>' +
+      '<button class="btn primary sm" id="trRestore">↩ Restore selected</button><button class="btn sm" id="trPurge" style="color:#a01c1c;border-color:#e3b4b4">Delete forever</button></div>' +
+      '<div class="tablewrap" style="max-height:60vh"><table><thead><tr><th></th><th>Deleted</th><th>By</th><th>Control No.</th><th>Sale date</th><th>Customer</th><th>Particulars</th><th class="n">Amount</th></tr></thead><tbody>' +
+      items.map(x => '<tr><td><input type="checkbox" data-tid="' + esc(x.id) + '" style="width:auto"></td><td>' + esc(x.at) + '</td><td class="hint">' + esc(x.by) + '</td><td>' + esc(x.ctrl) + '</td><td>' + esc(x.date ? fmtDate(x.date) : '') + '</td><td><b>' + esc(x.customer) + '</b></td><td>' + esc(x.particulars) + '</td><td class="n">' + peso(x.amount) + '</td></tr>').join('') +
+      '</tbody></table></div><p class="hint">Restored lines are added back at the end of the sales tab with the same control no., date and details.</p>';
+    $('trAll').onchange = e => $('trBody').querySelectorAll('[data-tid]').forEach(c => c.checked = e.target.checked);
+    // ticking one line of a sale ticks the other lines of the same sale
+    $('trBody').querySelectorAll('[data-tid]').forEach(c => c.onchange = () => {
+      const it = items.find(x => x.id === c.dataset.tid);
+      if (it && it.ctrl) items.filter(x => x.ctrl === it.ctrl && x.date === it.date).forEach(x => { const o = $('trBody').querySelector('[data-tid="' + x.id + '"]'); if (o) o.checked = c.checked; });
+    });
+    const picked = () => [...$('trBody').querySelectorAll('[data-tid]:checked')].map(c => c.dataset.tid);
+    $('trRestore').onclick = async () => {
+      const ids = picked(); if (!ids.length) return toast('Tick the lines to restore.', true);
+      $('trRestore').disabled = true; $('trRestore').textContent = 'Restoring…';
+      try { const r = await api('restoreTrash', ids); toast('Restored ' + r.restored + ' line(s) to the sheet ✓'); items = items.filter(x => !ids.includes(x.id)); draw(); load(true, true); }
+      catch (e){ toast('Restore failed: ' + (e.message || e), true); draw(); }
+    };
+    $('trPurge').onclick = async () => {
+      const ids = picked(); if (!ids.length) return toast('Tick the lines to delete forever.', true);
+      if (!confirm('Delete ' + ids.length + ' line(s) FOREVER? This cannot be undone.')) return;
+      try { await api('purgeTrash', ids); toast('Deleted forever'); items = items.filter(x => !ids.includes(x.id)); draw(); }
+      catch (e){ toast('Failed: ' + (e.message || e), true); }
+    };
+  };
+  draw();
+}
 async function openLedger(){
   const d = $('ledDate').value || todayISO();
   if (DATA_SINCE && d < DATA_SINCE) return toast('This date is older than the loaded data — click "All" in the period buttons first, then print again.', true);
@@ -1388,8 +1429,8 @@ async function delRow(r){
     ROWS = ROWS.filter(x => !x._pending).concat(pendingRows()); renderDay(); if (summaryVisible()) renderSummary(); updateNet(); return;
   }
   if (needOnline('Deleting')) return;
-  if (!confirm('Delete this line from the Google Sheet?\n\n' + (r._ctrl ? r._ctrl + ' · ' : '') + r.customer + '\n' + r.particulars + ' · ' + kgf(r._kg) + ' kg · ' + peso(r._amt))) return;
-  try { await api('deleteRow', r._row, {customer: r.customer, particulars: r.particulars}); toast('Deleted'); load(true); }
+  if (!confirm('Delete this line from the Google Sheet?\nIt goes to the 🗑 Trash, where it can be restored.\n\n' + (r._ctrl ? r._ctrl + ' · ' : '') + r.customer + '\n' + r.particulars + ' · ' + kgf(r._kg) + ' kg · ' + peso(r._amt))) return;
+  try { await api('deleteRow', r._row, {customer: r.customer, particulars: r.particulars}, ($('eRep').value || store('rep') || '') + ' · ' + DEVICE); toast('Moved to 🗑 Trash — you can restore it from there'); load(true); }
   catch (e){ toast('Delete failed: ' + (e.message || e), true); }
 }
 
@@ -1426,7 +1467,7 @@ function renderSummary(){
 /* ---------- daily Cash vs Credit / Salary-deduct analysis ---------- */
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 // Credit/Salary deduct = any salary-deduction customer OR a credit mode of payment; everything else = Cash
-const isCreditSale = r => r.custCat === CAT.employee || /SALARY/i.test(r.custCat) || isCredit(r.mode);
+const isCreditSale = r => r.custCat === CAT.employee || /SALARY|DEDUC|EMPLOYEE/i.test(r.custCat) || isCredit(r.mode) || /SALARY|DEDUC/i.test(r.mode);
 let DAILY = [];
 function renderDaily(v, f){
   const m = new Map();
@@ -1458,11 +1499,31 @@ function renderDaily(v, f){
     '<tr><th class="hCash" colspan="3">CASH</th><th class="hCred" colspan="3">CREDIT / SALARY DEDUCT</th></tr>' +
     '<tr><th class="hAll">Date</th><th class="hAll">Day</th><th class="hAll">Transactions</th><th class="hAll">Weight (kg)</th><th class="hAll">Amount (₱)</th>' +
     '<th class="hCash"># of Transactions</th><th class="hCash">Weight (kg)</th><th class="hCash">Amount (₱)</th><th class="hCred"># of Transactions</th><th class="hCred">Weight (kg)</th><th class="hCred">Amount (₱)</th></tr></thead><tbody>' +
-    (days.length ? days.map(e => '<tr' + (e.d === today ? ' class="today"' : '') + '><td class="l">' + slashDate(e.d) + '</td><td class="l">' + dayOf(e.d) + '</td>' + cells(e) + '</tr>').join('')
+    (days.length ? days.map(e => '<tr data-day="' + e.d + '" title="Click to see who was counted as Cash and as Credit / Salary deduct" class="clk' + (e.d === today ? ' today' : '') + '"><td class="l">' + slashDate(e.d) + '</td><td class="l">' + dayOf(e.d) + '</td>' + cells(e) + '</tr>').join('')
       : '<tr><td class="l muted" colspan="11" style="text-align:center;padding:16px">No sales in the selected period.</td></tr>') +
     '<tr class="tot"><td class="l" colspan="2">' + totLabel + '</td>' + cells(T) + '</tr>' +
     '<tr class="avg"><td class="l" colspan="2">DAILY AVERAGE</td>' + cells(avg) + '</tr>' +
     '<tr class="shr"><td class="l" colspan="2">% SHARE OF AMOUNT</td><td></td><td></td><td></td><td></td><td></td><td>' + (T.amt ? (T.camt / T.amt * 100).toFixed(1) + '%' : '-') + '</td><td></td><td></td><td>' + (T.amt ? (T.xamt / T.amt * 100).toFixed(1) + '%' : '-') + '</td></tr></tbody>';
+}
+/** Click a day in the daily table → who was counted as Cash and who as Credit / Salary deduct (to check the sheet data). */
+function openDayDetail(day){
+  const rows = ROWS.filter(r => r._date === day);
+  const per = new Map();
+  rows.forEach(r => {
+    const t = isCreditSale(r) ? 'Credit / Salary deduct' : 'Cash';
+    const k = t + '|' + key(r.customer);
+    const e = per.get(k) || {t, customer: r.customer, cats: new Set(), modes: new Set(), lines: 0, amt: 0};
+    e.cats.add(r.custCat || '(blank)'); e.modes.add(r.mode || '(blank)'); e.lines++; e.amt += r._amt; per.set(k, e);
+  });
+  const list = [...per.values()].sort((a, b) => a.t.localeCompare(b.t) || a.customer.localeCompare(b.customer));
+  const nC = list.filter(x => x.t === 'Cash').length, nX = list.length - nC;
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>' + esc(longDate(day)) + ' — ' + nC + ' cash · ' + nX + ' credit / salary deduct (per person)</h3><button class="btn ghost sm" data-x>✕</button></div>' +
+    '<div class="body"><p class="hint" style="margin-top:0">Counted as <b>Credit / Salary deduct</b> when CUSTOMER CATEGORY has "SALARY / DEDUCT" or MODE OF PAYMENT is CREDIT / SALARY DEDUCTION. Everything else is Cash. ' +
+    'If a value here differs from the sheet, click <b>⟳ Sync</b> to read the sheet again.</p>' +
+    '<div class="tablewrap" style="max-height:62vh"><table><thead><tr><th>Counted as</th><th>Customer</th><th>Customer category (sheet)</th><th>Mode of payment (sheet)</th><th class="n">Lines</th><th class="n">Amount</th></tr></thead><tbody>' +
+    list.map(x => '<tr><td><b>' + esc(x.t) + '</b></td><td>' + esc(x.customer) + '</td><td>' + esc([...x.cats].join(', ')) + '</td><td>' + esc([...x.modes].join(', ')) + '</td><td class="n">' + x.lines + '</td><td class="n">' + peso(x.amt) + '</td></tr>').join('') +
+    '</tbody></table></div></div></div></div>';
+  $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
 }
 function exportDaily(){
   const head = ['Date','Day','Transactions','Weight (kg)','Amount','Cash # of Transactions','Cash Weight (kg)','Cash Amount','Credit/Salary Deduct # of Transactions','Credit/Salary Deduct Weight (kg)','Credit/Salary Deduct Amount'];
@@ -1644,9 +1705,11 @@ window.addEventListener('offline', () => { setOnline(false); toast('Internet los
 // stop any helper file registered by an earlier version (no sw.js is used any more)
 if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => {});
 $('btnDailyCsv').onclick = exportDaily;
+$('dailyTable').addEventListener('click', e => { const tr = e.target.closest('tr[data-day]'); if (tr) openDayDetail(tr.dataset.day); });
 $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
 $('btnSettings').onclick = openSettings;
+$('btnTrash').onclick = openTrash;
 // text size: 50% (default) · 75% · 100% — remembered on this computer
 const FS_STEPS = [0.5, 0.75, 1];
 function applyFs(v){ document.documentElement.style.setProperty('--fs', v); $('fsLabel').textContent = Math.round(v * 100) + '%'; store('fs', String(v)); }
