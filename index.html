@@ -245,6 +245,7 @@
   .ledger .via.v-QR{border-color:#1f4fa8;color:#1f4fa8}
   .ledger .viaedit{display:inline-flex!important;align-items:center;gap:4px;margin:0!important;padding:1px 6px;border:1px dashed #1f4fa8;border-radius:3px;font-size:10px;font-weight:700;color:#1f4fa8;cursor:pointer;text-transform:none!important;letter-spacing:0!important;background:#f4f8ff}
   .ledger .viaedit input{width:auto;margin:0}
+  .ltab.limtab-btn{border-color:#1f4fa8;color:#1f4fa8;background:#f4f8ff}
   table.limtab td{white-space:nowrap}
   table.limtab input{width:110px;display:inline-block;margin-right:4px}
   .ledger select.viasel{width:auto;padding:1px 4px;font-size:10.5px;font-weight:700;border:1px dashed #1f4fa8;color:#1f4fa8;background:#f4f8ff;border-radius:3px}
@@ -334,6 +335,7 @@
             <span><b id="eVerifyTxt">Verify with employee list</b><small id="eVerifySub"></small></span></label>
           <div class="vf" id="eBUBox"><label>Business unit <span class="req">*</span></label><select id="eBU"></select></div>
           <div class="vf idf" id="eEmpNoBox"><label>ID # (for ATD) <span class="req">*</span></label><input id="eEmpNo" placeholder="Employee ID"></div>
+          <button class="btn sm" id="eLimitsBtn" type="button" style="margin-left:auto" title="Credit limit per cut-off by business unit and payroll group">💳 Credit limits</button>
         </div>
 
         <div class="frow six">
@@ -1280,19 +1282,25 @@ function saveLocalCopy(){
 /* ================= CREDIT LIMITS: business unit × payroll group ================= */
 function openLimits(){
   const groups = payrollGroups(), L = SD_RULES.limits || {};
-  if (!groups.length) return toast('Upload the employee lists first — the payroll groups are taken from them.', true);
-  const def = num(SD_RULES.limit);
+  const def = num(SD_RULES.limit), cutNow = (SD_RULES.cut || [15, 31]).join(',');
   const cnt = (c, g) => (LISTS.employees[c] || []).filter(e => (key(e.payroll) || 'BLANK') === g).length;
-  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
-    '<p class="hint" style="margin-top:0">Amount each employee can avail per cut-off, by <b>business unit</b> and <b>payroll group</b>. Leave a box blank to use the default (' + (def ? peso(def) : 'no limit') + '). Type 0 for no limit. The small number is how many employees are in that group.</p>' +
-    '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
-    COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
-      const k = c + '|' + g.k, n = cnt(c, g.k);
-      return '<td><input type="number" min="0" step="any" data-lim="' + esc(k) + '" placeholder="' + (def ? money(def) : '—') + '" value="' + (L[k] !== undefined ? esc(L[k]) : '') + '"' + (n ? '' : ' style="opacity:.55"') + '><span class="hint">' + n + ' emp.</span></td>';
-    }).join('') + '</tr>').join('') +
-    '</tbody></table></div>' +
-    '<div class="toolbar" style="margin-top:10px"><span class="hint">Fill a whole column: </span>' + groups.map(g => '<button class="btn sm" data-fill="' + esc(g.k) + '">' + esc(g.label) + '</button>').join('') + '</div>' +
-    '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="limSave">Save limits for all users</button></div></div></div>';
+  const presets = [['15,31','1–15 and 16–end of month'],['10,25','11–25 and 26–10'],['5,20','6–20 and 21–5'],['31','Monthly (1–end of month)']];
+  if (!presets.some(p => p[0] === cutNow)) presets.push([cutNow, 'Cut-off days ' + cutNow.replace(',', ' & ')]);
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>💳 Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
+    '<p class="hint" style="margin-top:0">Shared by all users. Checked when employee verification is ON: an employee who reaches the limit cannot avail more salary deduction until the next cut-off.' + (SD_RULES.updated ? ' Last changed ' + esc(SD_RULES.updated) + '.' : '') + '</p>' +
+    '<div class="fgrid" style="margin-bottom:12px"><div><label>Default limit per employee per cut-off (₱, 0 = no limit)</label><input id="limDef" type="number" min="0" step="any" value="' + esc(def || 0) + '"></div>' +
+    '<div><label>Cut-off periods</label><select id="limCut">' + presets.map(([v, l]) => '<option value="' + v + '"' + (v === cutNow ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></div></div>' +
+    (groups.length
+      ? '<label>Limit per business unit &amp; payroll group <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— blank = use the default · 0 = no limit · small number = employees in that group</span></label>' +
+        '<div class="tablewrap"><table class="limtab"><thead><tr><th>Business unit</th>' + groups.map(g => '<th>' + esc(g.label) + '</th>').join('') + '</tr></thead><tbody>' +
+        COMPANIES.map(c => '<tr><td><b>' + c + '</b></td>' + groups.map(g => {
+          const k = c + '|' + g.k, n = cnt(c, g.k);
+          return '<td><input type="number" min="0" step="any" data-lim="' + esc(k) + '" placeholder="default" value="' + (L[k] !== undefined ? esc(L[k]) : '') + '"' + (n ? '' : ' style="opacity:.55"') + '><span class="hint">' + n + ' emp.</span></td>';
+        }).join('') + '</tr>').join('') +
+        '</tbody></table></div>' +
+        '<div class="toolbar" style="margin-top:10px"><span class="hint">Fill a whole column: </span>' + groups.map(g => '<button class="btn sm" data-fill="' + esc(g.k) + '">' + esc(g.label) + '</button>').join('') + '</div>'
+      : '<p class="hint">Upload the employee lists (Rates &amp; Lists → Employees) to set different limits per business unit and payroll group. Until then the default limit applies to everyone.</p>') +
+    '</div><div class="foot"><button class="btn" data-x>Cancel</button><button class="btn primary" id="limSave">Save for all users</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
   $('modalRoot').querySelectorAll('[data-fill]').forEach(b => b.onclick = () => {
     const v = prompt('Limit for ' + b.textContent + ' in ALL business units (₱, blank = default):', ''); if (v === null) return;
@@ -1303,8 +1311,11 @@ function openLimits(){
     const limits = {};
     $('modalRoot').querySelectorAll('[data-lim]').forEach(i => { if (i.value.trim() !== '') limits[i.dataset.lim] = num(i.value); });
     $('limSave').disabled = true;
-    try { SD_RULES = await api('saveSdRules', {limit: num(SD_RULES.limit), cut: SD_RULES.cut, limits}); $('modalRoot').innerHTML = ''; onCustomer(true); toast('Credit limits saved for all users ✓ (' + Object.keys(limits).length + ' set)'); }
-    catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
+    try {
+      SD_RULES = await api('saveSdRules', {limit: num($('limDef').value), cut: $('limCut').value.split(',').map(Number), limits});
+      $('modalRoot').innerHTML = ''; onCustomer(true);
+      toast('Credit limits saved for all users ✓ — default ' + (SD_RULES.limit ? peso(SD_RULES.limit) : 'no limit') + (Object.keys(limits).length ? ' · ' + Object.keys(limits).length + ' group limit(s)' : ''));
+    } catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
   };
 }
 
@@ -1651,7 +1662,8 @@ let LEDIT = {key:'rates', rows:[], dirty:false}, EMPCOMP = COMPANIES[0];
 function empTotal(){ return COMPANIES.reduce((a, c) => a + (LISTS.employees[c] || []).length, 0); }
 function renderLtabs(){
   $('ltabs').innerHTML = Object.keys(LIST_UI).map(k => '<div class="ltab' + (k === LEDIT.key ? ' active' : '') + '" data-l="' + k + '">' + LIST_UI[k].title +
-    ' <span style="opacity:.7">(' + (k === 'employees' ? empTotal() : (LISTS[k] || []).length) + ')</span></div>').join('');
+    ' <span style="opacity:.7">(' + (k === 'employees' ? empTotal() : (LISTS[k] || []).length) + ')</span></div>').join('') +
+    '<div class="ltab limtab-btn" data-limits="1" title="Salary deduction credit limit per cut-off">💳 Credit limits</div>';
 }
 function openList(k){
   if (LEDIT.dirty && k !== LEDIT.key && !confirm('Discard unsaved changes in ' + LIST_UI[LEDIT.key].title + '?')) return;
@@ -1804,12 +1816,8 @@ function openSettings(){
       '<div><label>Access key</label><input id="stKey" type="text" autocomplete="off" value="' + esc(c.key) + '"' + (HAS_GAS ? ' disabled' : '') + '></div></div>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Salary deduction</h2>' +
     '<label style="display:flex;gap:8px;align-items:center;text-transform:none;font-size:max(10.4px, calc(13px * var(--fs)));color:var(--ink)"><input type="checkbox" id="stVerify" style="width:auto"' + (s.verifyEmp !== false ? ' checked' : '') + '> Verify employees: only employees in the Employees list who are already <b>regular</b> can avail salary deduction</label>' +
-    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:14px">Salary deduction credit limit <span style="text-transform:none;letter-spacing:0;font-weight:400">— shared by all users, checked when verification is ON</span></h2><div class="fgrid">' +
-      '<div><label>Default limit per employee per cut-off (₱, 0 = no limit)</label><input id="stLimit" type="number" min="0" step="any" value="' + esc(num(SD_RULES.limit) || 0) + '"></div>' +
-      '<div><label>Cut-off periods</label><select id="stCut">' + [['15,31','1–15 and 16–end of month'],['10,25','11–25 and 26–10'],['5,20','6–20 and 21–5'],['31','Monthly (1–end of month)']]
-        .map(([v, l]) => '<option value="' + v + '"' + ((SD_RULES.cut || [15, 31]).join(',') === v ? ' selected' : '') + '>' + l + '</option>').join('') +
-        (['15,31','10,25','5,20','31'].includes((SD_RULES.cut || []).join(',')) ? '' : '<option value="' + esc((SD_RULES.cut || []).join(',')) + '" selected>Cut-off days ' + esc((SD_RULES.cut || []).join(' & ')) + '</option>') + '</select></div>' +
-      '<div class="span2"><button class="btn sm" id="stLimits" type="button">Limits per business unit &amp; payroll group…</button> <span class="hint">' + Object.keys(SD_RULES.limits || {}).length + ' set · others use the default</span></div></div>' +
+    '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:14px">Salary deduction credit limit</h2>' +
+    '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn sm" id="stLimits" type="button">💳 Set credit limits…</button><span class="hint">' + (num(SD_RULES.limit) ? 'Default ' + peso(SD_RULES.limit) : 'No default limit') + ' · ' + Object.keys(SD_RULES.limits || {}).length + ' group limit(s) · cut-off ' + esc((SD_RULES.cut || [15, 31]).join(' & ')) + '</span></div>' +
     '<h2 style="font-size:max(10px, calc(12px * var(--fs)));color:var(--muted);margin-top:16px">Print slip</h2><div class="fgrid">' +
       '<div class="span2"><label>Company name</label><input id="stCo" value="' + esc(s.company) + '"></div>' +
       '<div class="span2"><label>Address</label><input id="stAddr" value="' + esc(s.address) + '"></div>' +
@@ -1835,11 +1843,6 @@ function openSettings(){
     catch (err){ toast('Restore failed: ' + err.message, true); }
   };
   $('stSave').onclick = () => {
-    const nl = num($('stLimit').value), nc = $('stCut').value.split(',').map(Number);
-    if (nl !== num(SD_RULES.limit) || nc.join(',') !== (SD_RULES.cut || []).join(',')){
-      if (!ONLINE) toast('The credit limit is shared — connect to the internet to change it.', true);
-      else api('saveSdRules', {limit: nl, cut: nc, limits: SD_RULES.limits || {}}).then(r => { SD_RULES = r; onCustomer(true); toast('Credit limits saved for all users ✓ (default ' + (r.limit ? peso(r.limit) : 'no limit') + ' per cut-off)'); }).catch(e => toast('Could not save the credit limit: ' + (e.message || e), true));
-    }
     saveSettings({company: $('stCo').value.trim() || DEFAULT_SETTINGS.company, address: $('stAddr').value.trim(), title: $('stTitle').value.trim() || DEFAULT_SETTINGS.title, arPrefix: $('stArPrefix').value.trim(), logo, verifyEmp: $('stVerify').checked});
     onCustomer(true);
     if (!HAS_GAS){ const u = $('stUrl').value.trim(), k = $('stKey').value.trim(); const changed = u !== conn().url || k !== conn().key; store('apiUrl', u); store('apiKey', k); if (changed) load(); }
@@ -1864,6 +1867,7 @@ $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
+$('eLimitsBtn').onclick = openLimits;
 // text size: 50% (default) · 75% · 100% — remembered on this computer
 const FS_STEPS = [0.5, 0.75, 1];
 function applyFs(v){ document.documentElement.style.setProperty('--fs', v); $('fsLabel').textContent = Math.round(v * 100) + '%'; store('fs', String(v)); }
@@ -1941,7 +1945,7 @@ $('dayTable').addEventListener('click', e => {
   renderSummary();
 }));
 document.querySelectorAll('[data-range]').forEach(b => b.onclick = () => setRange(b.dataset.range));
-$('ltabs').addEventListener('click', e => { const t = e.target.closest('[data-l]'); if (t) openList(t.dataset.l); });
+$('ltabs').addEventListener('click', e => { if (e.target.closest('[data-limits]')) return openLimits(); const t = e.target.closest('[data-l]'); if (t) openList(t.dataset.l); });
 $('lSearch').addEventListener('input', renderList);
 $('lAdd').onclick = () => { const o = {}; LIST_UI[LEDIT.key].cols.forEach(c => o[c.k] = c.opts ? c.opts[0] : ''); LEDIT.rows.unshift(o); $('lSearch').value = ''; setDirty(true); renderList(); $('lTable').querySelector('tbody input').focus(); };
 $('lTable').addEventListener('input', e => { const el = e.target; if (el.dataset.i === undefined) return; LEDIT.rows[+el.dataset.i][el.dataset.k] = el.value; setDirty(true); });
