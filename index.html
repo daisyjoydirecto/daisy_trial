@@ -651,18 +651,22 @@ function setCustList(){
 function isRegular(emp, onDate){ const r = toISO(emp && emp.regular); return /^\d{4}-\d{2}-\d{2}$/.test(r) && r <= (onDate || todayISO()); }
 function verifyOn(){ return settings().verifyEmp !== false; }
 /* ---------- salary deduction credit limit per cut-off ---------- */
-let SD_RULES = {limit: 0, cut: [15, 31], limits: {}, periods: [], balStart: ''};   // shared by all users (kept on the server, changed in ⚙ Settings)
+/* Company cut-offs: orders 26th–10th → pay day 8th · orders 11th–25th → pay day 23rd */
+const REG_CUT = [10, 25];
+let SD_RULES = {limit: 0, cut: REG_CUT, limits: {}, periods: [], balStart: ''};   // shared by all users (kept on the server, changed in ⚙ Settings)
 const dim = (y, m) => new Date(y, m + 1, 0).getDate();   // days in month (m = 0-11)
 /** Cut-off period that contains the date: {from, to, label}. cut = cut-off days, e.g. [15,31] → 1–15 and 16–end of month. */
+/** Pay day of a cut-off from its last day: ends on the 10th (26th–10th) → 8th · ends on the 25th (11th–25th) → 23rd */
+function payDayOf(toIso){ const d = +String(toIso).slice(8, 10); return d <= 17 ? '8th' : '23rd'; }
 function cutoffOf(iso){
   const P = (SD_RULES.periods || []).filter(p => p.from && p.to);
   const man = P.find(p => iso >= p.from && iso <= p.to);
-  const lab = (f, t) => fmtDate(f).replace(/ \d{4}$/, '') + ' – ' + fmtDate(t);
+  const lab = (f, t) => fmtDate(f).replace(/ \d{4}$/, '') + ' – ' + fmtDate(t) + ' · pay day ' + payDayOf(t);
   if (man) return {from: man.from, to: man.to, label: lab(man.from, man.to), manual: true};
   const [y, m] = iso.split('-').map(Number), ends = [];
   for (let k = -2; k <= 2; k++){
     const dt = new Date(y, m - 1 + k, 1), yy = dt.getFullYear(), mm = dt.getMonth();
-    (SD_RULES.cut && SD_RULES.cut.length ? SD_RULES.cut : [15, 31]).forEach(c => ends.push(isoOf(new Date(yy, mm, Math.min(c, dim(yy, mm))))));
+    REG_CUT.forEach(c => ends.push(isoOf(new Date(yy, mm, Math.min(c, dim(yy, mm))))));
   }
   ends.sort();
   let to = ends.find(e => e >= iso), from = addDays(ends.filter(e => e < iso).pop(), 1);
@@ -1365,7 +1369,7 @@ function openLimits(){
   const tmpMap = Object.assign({}, SD_RULES.groupMap || {});
   $('modalRoot').innerHTML = '<div class="overlay"><div class="modal wide"><div class="mh"><h3>💳 Salary deduction credit limit per cut-off</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
     '<p class="hint" style="margin-top:0">Shared by all users. Checked when employee verification is ON: an employee who reaches the limit cannot avail more salary deduction until the next cut-off. An unpaid balance lowers that employee\'s own limit.' + (SD_RULES.updated ? ' Last changed ' + esc(SD_RULES.updated) + '.' : '') + '</p>' +
-    '<label>Cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— two cut-offs per month. Days not covered here follow 1–15 and 16–end of month.</span></label>' +
+    '<label>Cut-off dates <span class="hint" style="text-transform:none;letter-spacing:0;font-weight:400">— two cut-offs per month: <b>26th – 10th</b> (pay day 8th) and <b>11th – 25th</b> (pay day 23rd). These apply automatically; add dates here only when a cut-off moves.</span></label>' +
     '<div id="limPeriods" style="display:grid;gap:6px;margin:6px 0 4px"></div><button class="btn sm" id="limAddM" type="button">+ Add a month (1st &amp; 2nd cut-off)</button> <button class="btn sm" id="limAddP" type="button">+ Add one cut-off</button>' +
     '<div style="height:14px"></div>' +
     (vals.length
@@ -1403,16 +1407,17 @@ function openLimits(){
     drawMatrix();
   });
   const addP = (f, t, tag) => { const d = document.createElement('div'); d.style.cssText = 'display:flex;gap:6px;align-items:center';
-    if (!tag && f){ const dt = new Date(f + 'T00:00:00'); tag = MONTHS[dt.getMonth()] + ' ' + dt.getFullYear() + (dt.getDate() <= 10 || (+f.slice(8) < 16 && +t.slice(8) <= 20) ? ' · 1st' : ' · 2nd'); }
-    d.innerHTML = '<b style="min-width:130px">' + esc(tag || 'Cut-off') + '</b><span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
+    if (!tag && t){ const dt = new Date(t + 'T00:00:00'); tag = MONTHS[dt.getMonth()].slice(0, 3) + ' ' + dt.getFullYear() + ' · pay day ' + payDayOf(t); }
+    d.innerHTML = '<b style="min-width:170px">' + esc(tag || 'Cut-off') + '</b><span class="hint">From</span><input type="date" data-pf value="' + esc(f || '') + '" style="max-width:170px"><span class="hint">to</span><input type="date" data-pt value="' + esc(t || '') + '" style="max-width:170px"><button class="btn sm" type="button" title="Remove these dates" style="color:#a01c1c">Remove</button>';
     d.querySelector('button').onclick = () => d.remove(); $('limPeriods').appendChild(d); };
   (SD_RULES.periods || []).slice().sort((a, b) => a.from.localeCompare(b.from)).forEach(p => addP(p.from, p.to));
   $('limAddP').onclick = () => addP('', '');
   $('limAddM').onclick = () => {
     const m = prompt('Which month? (e.g. 2026-11)', todayISO().slice(0, 7)); if (!m) return;
     const mm = /^(\d{4})-(\d{1,2})$/.exec(m.trim()); if (!mm) return toast('Type the month like 2026-11', true);
-    const y = +mm[1], mo = +mm[2] - 1, mid = isoOf(new Date(y, mo, 15)), name = MONTHS[mo] + ' ' + y;
-    addP(isoOf(new Date(y, mo, 1)), mid, name + ' · 1st'); addP(addDays(mid, 1), isoOf(new Date(y, mo, dim(y, mo))), name + ' · 2nd');
+    const y = +mm[1], mo = +mm[2] - 1, name = MONTHS[mo].slice(0, 3) + ' ' + y;
+    addP(isoOf(new Date(y, mo - 1, 26)), isoOf(new Date(y, mo, 10)), name + ' · pay day 8th');
+    addP(isoOf(new Date(y, mo, 11)), isoOf(new Date(y, mo, 25)), name + ' · pay day 23rd');
   };
   $('limSave').onclick = async () => {
     if (needOnline('Saving the credit limits')) return;
@@ -1424,7 +1429,7 @@ function openLimits(){
     if (ov) return toast('Cut-offs overlap around ' + fmtDate(ov.from) + ' — each day can belong to only one cut-off.', true);
     $('limSave').disabled = true;
     try {
-      SD_RULES = await api('saveSdRules', {limit: 0, cut: [15, 31], limits, periods, balStart: '', groupMap: tmpMap});
+      SD_RULES = await api('saveSdRules', {limit: 0, cut: REG_CUT, limits, periods, balStart: '', groupMap: tmpMap});
       $('modalRoot').innerHTML = ''; onCustomer(true); if (summaryVisible()) fillSdCuts();
       toast('Credit limits saved for all users ✓ — ' + Object.keys(limits).length + ' limit(s) set');
     } catch (e){ toast('Could not save: ' + (e.message || e), true); $('limSave').disabled = false; }
