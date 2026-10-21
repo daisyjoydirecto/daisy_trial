@@ -281,6 +281,8 @@
   .ledger table.sdl td{padding:4px}
   .ledger tr.owe td{background:#fff8ef}
   .ledger tr.over td{color:#c62828;background:#fff1f1;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ledger tr.nomatch td{color:#c25e00;background:#fff4e5;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ledger tr.nomatch td .hint{color:#c25e00}
   .ledger .overtag{font-size:10px;font-weight:700;color:#c62828}
   .ledger .boxes .overbox{border-color:#c62828;background:#fff1f1;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .ledger .boxes .overbox b{color:#c62828}
@@ -1537,11 +1539,11 @@ function sdLedgerHtml(from, to, filter){
       (list.length ? list.map((x, n) => {
         const base = x.emp ? limitFor(x.emp) : 0;
         const nextLim = base > 0 ? nextLimitOf(base, x.end[i]) : null;   // Next limit = limit − (remaining balance above the limit)
-        return '<tr class="' + (x._over ? 'over' : x.end[i] > 0.005 ? 'owe' : '') + '"' + (x._over ? ' title="Purchases are over the credit limit by ' + money(r2(x.purch[i] - x._lim)) + '"' : '') + '><td>' + (n + 1) + '</td><td>' + esc(x.company || '—') + '</td><td>' + esc(x.empNo || '') + '</td><td><b>' + esc(x.name) + '</b>' + (x.emp ? '' : ' <span class="hint">(not in list)</span>') + (x._over ? '<br><span class="overtag">▲ over by ₱' + money(r2(x.purch[i] - x._lim)) + '</span>' : '') + '</td><td>' + esc(payGroupLabel(x.group)) + '</td>' +
+        return '<tr class="' + (x._over ? 'over' : (!x.emp || x.group === 'OTHER') ? 'nomatch' : x.end[i] > 0.005 ? 'owe' : '') + '"' + (x._over ? ' title="Purchases are over the credit limit by ' + money(r2(x.purch[i] - x._lim)) + '"' : '') + '><td>' + (n + 1) + '</td><td>' + esc(x.company || '—') + '</td><td>' + esc(x.empNo || '') + '</td><td><b>' + esc(x.name) + '</b>' + (x.emp ? '' : ' <span class="hint">(not in list)</span>') + (x._over ? '<br><span class="overtag">▲ over by ₱' + money(r2(x.purch[i] - x._lim)) + '</span>' : '') + '</td><td>' + esc(payGroupLabel(x.group)) + '</td>' +
           '<td class="n">' + (x._lim === null ? '—' : money(x._lim)) + '</td><td class="n">' + M(x.beg[i]) + '</td><td class="n">' + (x._over ? '<b>' + M(x.purch[i]) + '</b>' : M(x.purch[i])) + '</td><td class="n">' + M(x.ded[i]) + '</td><td class="n"><b>' + M(x.end[i]) + '</b></td><td class="n">' + (nextLim === null ? '—' : money(nextLim)) + '</td></tr>';
       }).join('') : '<tr><td colspan="11" style="text-align:center;padding:14px;color:#777">No salary deduction activity in this cut-off.</td></tr>') +
       '<tr class="tot"><td colspan="6" style="text-align:right">TOTAL</td><td class="n">' + money(T.beg) + '</td><td class="n">' + money(T.pur) + '</td><td class="n">' + money(T.ded) + '</td><td class="n">' + money(T.end) + '</td><td></td></tr></tbody></table>' +
-    '<div class="hint" style="margin-top:6px;color:#555">Credit limit = the employee\'s limit for this cut-off (less any balance above the limit carried from the last cut-off). <span style="color:#c62828;font-weight:700">Red</span> = purchases over the credit limit. Remaining balance = beginning balance + purchases − payroll deduction. Balances count from ' + esc(fmtDate(L.start)) + '. "Next limit" = credit limit − the part of the remaining balance that is above the limit (e.g. limit 1,000 and remaining balance 1,400 → next limit 600; remaining 400 → next limit stays 1,000).</div>' +
+    '<div class="hint" style="margin-top:6px;color:#555">Credit limit = the employee\'s limit for this cut-off (less any balance above the limit carried from the last cut-off). <span style="color:#c62828;font-weight:700">Red</span> = purchases over the credit limit. <span style="color:#c25e00;font-weight:700">Orange</span> = not matched: not found in the Employees list, or payroll group not matched. Remaining balance = beginning balance + purchases − payroll deduction. Balances count from ' + esc(fmtDate(L.start)) + '. "Next limit" = credit limit − the part of the remaining balance that is above the limit (e.g. limit 1,000 and remaining balance 1,400 → next limit 600; remaining 400 → next limit stays 1,000).</div>' +
     '<div class="sig3"><div>Prepared by</div><div>Checked by</div><div>Noted by (Payroll)</div></div>' +
     '<div class="foot"><span>Sales Meat &amp; Livestock · salary deduction</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
   '</div>';
