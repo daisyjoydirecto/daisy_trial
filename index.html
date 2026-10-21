@@ -1616,31 +1616,76 @@ function renderEmployees(){
     (shown.length ? shown.slice(0, 1000).map(e => '<tr><td>' + esc(e.empNo) + '</td><td><b>' + esc(e.name) + '</b></td><td>' + esc(e.position) + '</td><td>' + esc(e.dept) + '</td><td>' + esc(e.payroll) + '</td><td>' + esc(fmtDate(e.hired)) + '</td><td>' + esc(fmtDate(e.regular)) + '</td></tr>').join('')
       : '<tr><td colspan="7" class="muted" style="padding:18px;text-align:center">No employees for ' + EMPCOMP + ' yet — upload the list above.</td></tr>') + '</tbody>';
 }
-function xlDate(v){ if (typeof v === 'number' && v > 20000 && v < 80000) return isoOf(new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4)); return toISO(v); }
-const EMP_COLS = {EMPLOYEENO:'empNo', EMPNO:'empNo', EMPLOYEENUMBER:'empNo', EMPLOYEENAME:'name', NAME:'name', POSITION:'position', DEPARTMENT:'dept',
-  PAYROLLGROUP:'payroll', DATEHIRED:'hired', DATEOFREGULARIZATION:'regular', REGULARIZATIONDATE:'regular'};
+function xlDate(v){
+  if (typeof v === 'number' && v > 20000 && v < 80000) return isoOf(new Date(Math.round((v - 25569) * 864e5) + new Date().getTimezoneOffset() * 6e4));
+  // Excel dates read in some time zones come out up to a minute early (e.g. 23:59:17 the day before) → round to the nearest hour
+  if (Object.prototype.toString.call(v) === '[object Date]' && !isNaN(v)) return isoOf(new Date(Math.round(v.getTime() / 3600000) * 3600000));
+  return toISO(v);
+}
+/* Column names are matched loosely (spaces, dots, case and extra words are ignored), on any sheet of the file. */
+const EMP_ALIASES = {
+  empNo:   ['EMPLOYEENO','EMPNO','EMPLOYEENUMBER','EMPLOYEEID','EMPID','EMPLOYEECODE','EMPCODE','IDNO','IDNUMBER','ID'],
+  name:    ['EMPLOYEENAME','EMPLOYEESNAME','NAMEOFEMPLOYEE','FULLNAME','COMPLETENAME','NAME','EMPLOYEE'],
+  last:    ['LASTNAME','SURNAME','FAMILYNAME'],
+  first:   ['FIRSTNAME','GIVENNAME'],
+  middle:  ['MIDDLENAME','MIDDLEINITIAL','MI'],
+  suffix:  ['SUFFIX','EXT','EXTENSION','NAMEEXTENSION'],
+  position:['POSITION','DESIGNATION','JOBTITLE','POSITIONTITLE','JOB'],
+  dept:    ['DEPARTMENT','DEPT','SECTION','DIVISION','UNIT'],
+  payroll: ['PAYROLLGROUP','PAYROLL','RANKLEVEL','RANK','EMPLOYEECLASS','CLASSIFICATION','LEVEL'],
+  hired:   ['DATEHIRED','HIREDATE','DATEOFHIRE','DATEEMPLOYED','HIRED','DATESTARTED','STARTDATE'],
+  regular: ['DATEOFREGULARIZATION','REGULARIZATIONDATE','DATEREGULARIZED','DATEOFREGULAR','REGULARIZATION','DATEREGULAR','REGULARDATE']
+};
+function empHeaderMap(row){
+  const map = {}, used = new Set();
+  // 1st pass exact names, 2nd pass "contains" (e.g. "EMPLOYEE NAME (LAST, FIRST)")
+  [true, false].forEach(exact => Object.keys(EMP_ALIASES).forEach(f => {
+    if (map[f] !== undefined) return;
+    for (const al of EMP_ALIASES[f]){
+      const i = row.findIndex((h, j) => !used.has(j) && key(h) && (exact ? key(h) === al : (al.length >= 4 && key(h).includes(al) && !(f === 'name' && /NO$|NUMBER|ID$|CODE|COMPANY|DEPART|BRANCH|POSITION|FATHER|MOTHER|SPOUSE|CONTACT|EMERGENCY|SUPERVISOR|MANAGER/.test(key(h))))));
+      if (i >= 0){ map[f] = i; used.add(i); break; }
+    }
+  }));
+  return map;
+}
 function parseEmployeeGrid(grid){
-  const hi = grid.findIndex(r => r.some(c => key(c) === 'EMPLOYEENAME'));
-  if (hi < 0) throw new Error('Could not find the "Employee Name" header in the file.');
-  const map = {};
-  grid[hi].forEach((h, i) => { const f = EMP_COLS[key(h)]; if (f && map[f] === undefined) map[f] = i; });
-  const out = [];
-  for (let i = hi + 1; i < grid.length; i++){
-    const r = grid[i], name = String(r[map.name] ?? '').trim();
-    if (!name) continue;
-    const g = f => map[f] === undefined ? '' : r[map[f]];
-    out.push({empNo: String(g('empNo') ?? '').trim(), name: name.replace(/\s+/g, ' '), position: String(g('position') ?? '').trim(), dept: String(g('dept') ?? '').trim(),
-      payroll: String(g('payroll') ?? '').trim(), hired: xlDate(g('hired')), regular: xlDate(g('regular'))});
+  let hi = -1, map = null, best = 0;
+  for (let i = 0; i < Math.min(grid.length, 40); i++){
+    const m = empHeaderMap(grid[i] || []);
+    const hasName = m.name !== undefined || (m.last !== undefined && m.first !== undefined);
+    const score = Object.keys(m).length + (hasName ? 5 : 0);
+    if (hasName && score > best){ best = score; hi = i; map = m; }
   }
-  return out;
+  if (hi < 0) return {list: [], headers: grid.slice(0, 8).map(r => (r || []).filter(String).join(' | ')).filter(Boolean)};
+  const out = [];
+  const g = (r, f) => map[f] === undefined ? '' : r[map[f]];
+  for (let i = hi + 1; i < grid.length; i++){
+    const r = grid[i] || [];
+    let name = String(g(r, 'name') ?? '').trim();
+    if (!name && map.last !== undefined){
+      const last = String(g(r, 'last') ?? '').trim(), first = String(g(r, 'first') ?? '').trim();
+      const mid = String(g(r, 'middle') ?? '').trim(), suf = String(g(r, 'suffix') ?? '').trim();
+      if (last && first) name = last + ', ' + first + (suf ? ' ' + suf : '') + (mid ? ' ' + (mid.length <= 2 ? mid.replace(/\.?$/, '.') : mid) : '');
+    }
+    if (!name || key(name) === key(grid[hi][map.name])) continue;
+    out.push({empNo: String(g(r, 'empNo') ?? '').trim(), name: name.replace(/\s+/g, ' '), position: String(g(r, 'position') ?? '').trim(), dept: String(g(r, 'dept') ?? '').trim(),
+      payroll: String(g(r, 'payroll') ?? '').trim(), hired: xlDate(g(r, 'hired')), regular: xlDate(g(r, 'regular'))});
+  }
+  return {list: out, cols: Object.keys(map)};
 }
 async function uploadEmployees(file, company){
   if (!ONLINE) throw new Error('uploading employees needs an internet connection');
   await needXLSX();
   const wb = XLSX.read(new Uint8Array(await readFile(file)), {type:'array', cellDates:true});
-  const grid = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:true, defval:''});
-  const list = parseEmployeeGrid(grid);
-  if (!list.length) throw new Error('No employees found in the file.');
+  // look at every sheet of the file and use the one with the most employees
+  let res = null, firstHeaders = null;
+  wb.SheetNames.forEach(n => {
+    const p = parseEmployeeGrid(XLSX.utils.sheet_to_json(wb.Sheets[n], {header:1, raw:true, defval:''}));
+    if (!p.list.length && !firstHeaders) firstHeaders = p.headers;
+    if (p.list.length && (!res || p.list.length > res.list.length)) res = p;
+  });
+  if (!res) throw new Error('Could not find an employee name column. The file needs a column like "Employee Name" (or "Last Name" + "First Name"). First rows found: ' + ((firstHeaders || []).slice(0, 3).join(' / ') || 'empty file'));
+  const list = res.list;
   // if the Department column holds the company codes, split the file by company automatically
   const codeOf = e => COMPANIES.find(c => new RegExp('\\b' + c + '\\b', 'i').test(e.dept)) || '';
   const coded = list.filter(e => codeOf(e)).length;
