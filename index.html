@@ -1704,7 +1704,7 @@ function openSdLedger(){
     '<select id="sdCo" style="width:auto"><option value="">All business units</option>' + COMPANIES.map(c => '<option>' + c + '</option>').join('') + '</select>' +
     '<input id="sdQ" placeholder="Search employee…" style="width:180px">' +
     '<button class="btn sm" id="sdExp">Expand all</button><button class="btn sm" id="sdCol">Collapse all</button>' +
-    '<button class="btn sm" id="sdCsv">Export CSV</button>' +
+    '<button class="btn sm" id="sdXlsx" title="Downloads what you see: collapsed rows stay collapsed, opened employees include their orders">⬇ Download Excel</button><button class="btn sm" id="sdCsv">CSV</button>' +
     '<button class="btn green" id="doPrint" style="font-size:max(12px, calc(15px * var(--fs)));padding:9px 20px;background:var(--lime);border-color:var(--lime);color:#0d0d0d">🖨 Print now</button><button class="btn ghost sm" data-x>✕</button></div>' +
     '<div class="slipwrap" id="sdWrap"></div></div></div>';
   const draw = () => { const y = $('sdWrap').scrollTop; $('sdWrap').innerHTML = sdLedgerHtml(from, to, f); $('sdWrap').scrollTop = y; };
@@ -1717,6 +1717,120 @@ function openSdLedger(){
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + sdLedgerHtml(from, to, f) + '</div>'; setTimeout(() => window.print(), 50); };
   $('sdCsv').onclick = () => sdCsvDownload(from, to, f);
+  $('sdXlsx').onclick = () => sdExcelDownload(from, to, f);
+}
+/* ---------- Excel download that looks like the ledger on screen (collapsed / expanded as shown) ---------- */
+let EXJ_P = null;
+function needExcelJS(){
+  if (typeof ExcelJS !== 'undefined') return Promise.resolve();
+  return EXJ_P || (EXJ_P = new Promise((res, rej) => {
+    const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js';
+    sc.onload = () => res(); sc.onerror = () => { EXJ_P = null; rej(new Error('The Excel maker did not load. Check the internet connection and try again.')); };
+    document.head.appendChild(sc);
+  }));
+}
+/** Same numbers as the ledger on screen. */
+function sdLedgerData(from, to, filter){
+  const L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
+  if (i < 0) return null;
+  const p = L.periods[i];
+  let list = [...L.people.values()].filter(x => x.beg[i] || x.purch[i] || x.ded[i] || x.end[i]);
+  if (filter && filter.co) list = list.filter(x => x.company === filter.co);
+  if (filter && filter.q) list = list.filter(x => (x.name + ' ' + x.empNo).toLowerCase().includes(filter.q));
+  list.sort((a, b) => (a.company || 'ZZ').localeCompare(b.company || 'ZZ') || a.name.localeCompare(b.name));
+  list.forEach(x => { x._lim = sdLimitAt(L, x, i); x._over = x._lim !== null && x.purch[i] > x._lim + 0.005; });
+  const orders = new Map();
+  ROWS.forEach(r => {
+    if (!isSdRow(r) || !r._date || r._date < p.from || r._date > p.to) return;
+    const m = /EMP#\s*([^\s·|]+)/.exec(r.remarks || ''), id = sdWho(r.customer, m ? m[1] : '').id;
+    if (!orders.has(id)) orders.set(id, []); orders.get(id).push(r);
+  });
+  const deds = new Map();
+  (LISTS.deductions || []).forEach(d => { if (String(d.from) !== p.from) return; const id = sdWho(d.name, d.empNo).id; deds.set(id, (deds.get(id) || 0) + num(d.amount)); });
+  const T = list.reduce((t, x) => { t.beg += x.beg[i]; t.pur += x.purch[i]; t.ded += x.ded[i]; t.end += x.end[i]; return t; }, {beg: 0, pur: 0, ded: 0, end: 0});
+  return {L, i, p, closed: L.closed[i], list, orders, deds, T, nOver: list.filter(x => x._over).length};
+}
+async function sdExcelDownload(from, to, f){
+  const D = sdLedgerData(from, to, f); if (!D) return toast('Nothing to download for this cut-off.', true);
+  toast('Preparing the Excel file…');
+  try { await needExcelJS(); } catch (e){ return toast(e.message, true); }
+  const s = settings(), wb = new ExcelJS.Workbook(), ws = wb.addWorksheet('Salary deduction ledger', {views: [{state: 'frozen', ySplit: 9}], pageSetup: {orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0, paperSize: 9}});
+  ws.columns = [{width: 6}, {width: 10}, {width: 12}, {width: 44}, {width: 19}, {width: 14}, {width: 15}, {width: 14}, {width: 14}, {width: 16}, {width: 14}];
+  const fill = c => ({type: 'pattern', pattern: 'solid', fgColor: {argb: 'FF' + c}});
+  const thin = {style: 'thin', color: {argb: 'FFDDDDDD'}}, MONEY = '#,##0.00;[Red]-#,##0.00', KG = '#,##0.00';
+  const i = D.i, p = D.p;
+  ws.mergeCells('A1:K1'); ws.getCell('A1').value = s.company; ws.getCell('A1').font = {bold: true, size: 14};
+  ws.mergeCells('A2:K2'); ws.getCell('A2').value = s.address; ws.getCell('A2').font = {size: 10, color: {argb: 'FF555555'}};
+  ws.mergeCells('A3:K3'); ws.getCell('A3').value = 'SALARY DEDUCTION LEDGER'; ws.getCell('A3').font = {bold: true, size: 13};
+  ws.mergeCells('A4:K4'); ws.getCell('A4').value = 'Cut-off ' + longDate(p.from) + ' – ' + longDate(p.to) + ' · pay day ' + payDayOf(p.to) + ' · ' + (D.closed ? 'payroll deductions uploaded' : 'payroll deductions not uploaded yet') + (f && f.co ? ' · ' + f.co : '');
+  ws.getCell('A4').font = {size: 10, color: {argb: D.closed ? 'FF333333' : 'FFA35400'}};
+  ws.getRow(1).border = {bottom: {style: 'medium', color: {argb: 'FF8DB600'}}};
+  // summary boxes
+  const box = [['Employees', D.list.length, '0'], ['Over the credit limit', D.nOver, '0'], ['Beginning balance', r2(D.T.beg), MONEY], ['Purchases this cut-off', r2(D.T.pur), MONEY], ['Deducted (payroll)', r2(D.T.ded), MONEY], ['Remaining balance', r2(D.T.end), MONEY]];
+  const r6 = ws.getRow(6), r7 = ws.getRow(7); r6.height = 24;
+  box.forEach(([l, v, fmt], k) => {
+    const col = [1, 3, 5, 7, 9, 11][k];
+    const a = r6.getCell(col), b = r7.getCell(col);
+    a.value = l.toUpperCase(); a.font = {size: 8, color: {argb: 'FF666666'}}; a.alignment = {wrapText: true, vertical: 'bottom'};
+    b.value = v; b.numFmt = fmt; b.font = {bold: true, size: 12, color: {argb: (k === 1 && v) ? 'FFC62828' : 'FF111111'}};
+  });
+  // table header
+  const H = ['#', 'BU', 'Emp. No.', 'Employee', 'Group', 'Credit limit', 'Beginning bal.', 'Purchases', 'Deducted', 'Remaining bal.', 'Next limit'];
+  const hr = ws.getRow(9); hr.values = H; hr.height = 20;
+  hr.eachCell(c => { c.fill = fill('1D1D1D'); c.font = {bold: true, color: {argb: 'FFFFFFFF'}, size: 10}; c.alignment = {vertical: 'middle', horizontal: c.col >= 6 ? 'right' : 'left'}; });
+  let r = 10;
+  D.list.forEach((x, n) => {
+    const nextLim = x.emp && limitFor(x.emp) > 0 ? nextLimitOf(limitFor(x.emp), x.end[i]) : null;
+    const row = ws.getRow(r++);
+    row.values = [n + 1, x.company || '—', x.empNo || '', x.name + (x.emp ? '' : ' (not in list)') + (x._over ? '  ▲ over by ' + money(r2(x.purch[i] - x._lim)) : ''),
+      payGroupLabel(x.group), x._lim === null ? '—' : x._lim, r2(x.beg[i]), r2(x.purch[i]), r2(x.ded[i]), r2(x.end[i]), nextLim === null ? '—' : nextLim];
+    const kind = x._over ? 'over' : (!x.emp || x.group === 'OTHER') ? 'nomatch' : x.end[i] > 0.005 ? 'owe' : '';
+    row.eachCell({includeEmpty: true}, c => {
+      if (c.col > 11) return;
+      if (c.col >= 6 && typeof c.value === 'number') c.numFmt = MONEY;
+      if (c.col >= 6) c.alignment = {horizontal: 'right'};
+      c.border = {bottom: thin};
+      if (kind === 'over'){ c.font = {color: {argb: 'FFC62828'}, bold: c.col === 4 || c.col === 8}; c.fill = fill('FFF1F1'); }
+      else if (kind === 'nomatch'){ c.font = {color: {argb: 'FFC25E00'}}; c.fill = fill('FFF4E5'); }
+      else if (kind === 'owe') c.fill = fill('FFF8EF');
+    });
+    row.getCell(4).font = Object.assign({}, row.getCell(4).font || {}, {bold: true}); row.getCell(4).alignment = {wrapText: true};
+    row.getCell(10).font = Object.assign({}, row.getCell(10).font || {}, {bold: true});
+    // order details — only for employees opened (▾) on screen
+    if (SD_OPEN.has(x.id)){
+      const dh = ws.getRow(r++); dh.values = ['', 'Date', 'Control No.', 'Product', 'DR / IDR', 'Kg', 'Rate', 'Amount', 'Rep'];
+      for (let c = 2; c <= 9; c++){ const cc = dh.getCell(c); cc.fill = fill('5C8000'); cc.font = {bold: true, size: 9, color: {argb: 'FFFFFFFF'}}; if (c >= 6 && c <= 8) cc.alignment = {horizontal: 'right'}; }
+      const os = (D.orders.get(x.id) || []).slice().sort((a, b) => (a._date + a._ctrl).localeCompare(b._date + b._ctrl));
+      const g = new Map(); os.forEach(o => { const k = o._date + '|' + (o._ctrl || o._row); if (!g.has(k)) g.set(k, []); g.get(k).push(o); });
+      g.forEach(lst => {
+        const o0 = lst[0], docs = [o0.dr ? 'DR ' + o0.dr : '', o0.inhouseDr ? 'IDR ' + o0.inhouseDr : ''].filter(Boolean).join(' / ');
+        lst.forEach((o, j) => {
+          const dr = ws.getRow(r++);
+          dr.values = ['', j ? '' : fmtDate(o0._date), j ? '' : (o0._ctrl || ''), o.particulars, j ? '' : docs, r2(o._kg), r2(o._rate), r2(o._amt), j ? '' : o0.rep];
+          for (let c = 2; c <= 9; c++){ const cc = dr.getCell(c); cc.fill = fill('FBFCF6'); cc.font = {size: 9}; if (c >= 6 && c <= 8){ cc.alignment = {horizontal: 'right'}; cc.numFmt = c === 6 ? KG : MONEY; } }
+        });
+        if (lst.length > 1){ const st = ws.getRow(r++); st.getCell(7).value = 'Order total'; st.getCell(8).value = r2(lst.reduce((a, o) => a + o._amt, 0)); st.getCell(8).numFmt = MONEY;
+          [7, 8].forEach(c => { st.getCell(c).font = {italic: true, size: 9, color: {argb: 'FF555555'}}; st.getCell(c).alignment = {horizontal: 'right'}; }); }
+      });
+      const tt = ws.getRow(r++); tt.getCell(7).value = g.size + ' order(s) — total purchases'; tt.getCell(8).value = r2(x.purch[i]); tt.getCell(8).numFmt = MONEY;
+      [7, 8].forEach(c => { tt.getCell(c).font = {bold: true, size: 9}; tt.getCell(c).alignment = {horizontal: 'right'}; tt.getCell(c).border = {top: {style: 'thin'}}; });
+      if (D.deds.get(x.id)){ const dd = ws.getRow(r++); dd.getCell(7).value = 'Payroll deduction this cut-off'; dd.getCell(8).value = -r2(D.deds.get(x.id)); dd.getCell(8).numFmt = MONEY;
+        [7, 8].forEach(c => { dd.getCell(c).font = {bold: true, size: 9, color: {argb: 'FF2E7D32'}}; dd.getCell(c).alignment = {horizontal: 'right'}; }); }
+      r++;   // a little space after the details
+    }
+  });
+  const tr = ws.getRow(r++); tr.values = ['', '', '', '', '', 'TOTAL', r2(D.T.beg), r2(D.T.pur), r2(D.T.ded), r2(D.T.end), ''];
+  tr.eachCell({includeEmpty: true}, c => { if (c.col > 11) return; c.font = {bold: true}; c.fill = fill('F1F7DC'); c.border = {top: {style: 'medium'}}; if (c.col >= 6){ c.alignment = {horizontal: 'right'}; if (typeof c.value === 'number') c.numFmt = MONEY; } });
+  r++;
+  const note = ws.getRow(r++); ws.mergeCells('A' + note.number + ':K' + note.number);
+  note.getCell(1).value = 'Red = purchases over the credit limit · Orange = not matched (not in Employees list or payroll group not matched) · Remaining balance = beginning balance + purchases − payroll deduction · Next limit = credit limit − the part of the remaining balance above the limit.';
+  note.getCell(1).font = {size: 8, color: {argb: 'FF555555'}}; note.getCell(1).alignment = {wrapText: true}; note.height = 28;
+  r++;
+  const sg = ws.getRow(r + 1); [[1, 'Prepared by'], [5, 'Checked by'], [9, 'Noted by (Payroll)']].forEach(([c, t]) => { sg.getCell(c).value = t; sg.getCell(c).border = {top: {style: 'thin'}}; sg.getCell(c).font = {size: 9}; });
+  const buf = await wb.xlsx.writeBuffer();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  a.download = 'salary-deduction-ledger-' + from + (f && f.co ? '-' + f.co : '') + (D.list.some(x => SD_OPEN.has(x.id)) ? '-with-orders' : '') + '.xlsx'; a.click();
+  toast('Excel file downloaded ✓');
 }
 function sdCsvDownload(from, to, f){
     const L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
@@ -1864,7 +1978,7 @@ async function sdViewBoot(){
     '<select id="vCo" style="width:auto"><option value="">All business units</option>' + COMPANIES.map(c => '<option>' + c + '</option>').join('') + '</select>' +
     '<input id="vQ" placeholder="Search employee…" style="width:200px"><span style="flex:1"></span>' +
     '<button class="btn sm" id="vExp">Expand all</button><button class="btn sm" id="vCol">Collapse all</button>' +
-    '<button class="btn" id="vCsv">⬇ Download CSV (Excel)</button><button class="btn primary" id="vPdf">🖨 Print / Save as PDF</button></div>' +
+    '<button class="btn" id="vCsv" title="Downloads what you see: collapsed rows stay collapsed, opened employees include their orders">⬇ Download Excel</button><button class="btn primary" id="vPdf">🖨 Print / Save as PDF</button></div>' +
     '<div class="slipwrap" id="vWrap" style="max-height:none"></div>';
   const cut = () => $('vCut').value.split('|');
   const draw = () => {
@@ -1880,7 +1994,7 @@ async function sdViewBoot(){
   $('vWrap').addEventListener('click', e => { const tr = e.target.closest('tr[data-sdid]'); if (!tr) return; const id = tr.dataset.sdid; SD_OPEN.has(id) ? SD_OPEN.delete(id) : SD_OPEN.add(id); draw(); });
   $('vExp').onclick = () => { $('vWrap').querySelectorAll('tr[data-sdid]').forEach(t => SD_OPEN.add(t.dataset.sdid)); draw(); };
   $('vCol').onclick = () => { SD_OPEN.clear(); draw(); };
-  $('vCsv').onclick = () => { const [a, b] = cut(); VIEW === 'ded' ? dedCsvDownload(a, b, f) : sdCsvDownload(a, b, f); };
+  $('vCsv').onclick = () => { const [a, b] = cut(); VIEW === 'ded' ? dedCsvDownload(a, b, f) : sdExcelDownload(a, b, f); };
   $('vPdf').onclick = () => { const [a, b] = cut(); $('printArea').innerHTML = '<div class="slip-page">' + (VIEW === 'ded' ? sdDeductionsHtml(a, b, f) : sdLedgerHtml(a, b, f)) + '</div>'; setTimeout(() => window.print(), 50); };
 }
 
