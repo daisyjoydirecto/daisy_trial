@@ -503,6 +503,7 @@
       <h2 style="margin:0;flex:1">Daily cash ledger</h2>
       <span class="hint">Cash sales of one day — per item, total per transaction, cash denomination and signatures</span>
       <div style="width:170px"><input type="date" id="ledDate"></div>
+      <button class="btn sm" id="btnCashShare" title="A link that anyone can open to view and print the daily cash ledger (read-only)">🔗 Share link</button>
       <button class="btn primary" id="btnLedger">🖨 Print cash ledger</button>
     </div>
     <div class="card" style="margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -514,7 +515,7 @@
       <button class="btn primary" id="btnSdLedger">📒 Open ledger</button>
     </div>
     <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
-      <div style="display:flex;align-items:center;padding:10px 14px"><h2 style="margin:0;flex:1">Daily sales — Cash vs Credit / Salary deduct</h2><button class="btn sm" id="btnDailyCsv">Export CSV</button></div>
+      <div style="display:flex;align-items:center;padding:10px 14px"><h2 style="margin:0;flex:1">Daily sales — Cash vs Credit / Salary deduct</h2><button class="btn sm" id="btnDailyShare" title="A link that anyone can open to view only this table (read-only)" style="margin-right:6px">🔗 Share link</button><button class="btn sm" id="btnDailyCsv">Export CSV</button></div>
       <div style="overflow:auto"><table class="daily" id="dailyTable"></table></div>
     </div>
     <div class="sgrid" id="sumTables"></div>
@@ -649,7 +650,7 @@ async function api(fn, ...args){
   // stop waiting after 90 s (a stuck connection is treated like no internet: saved copy + Sync still work)
   const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ac ? setTimeout(() => ac.abort(), 90000) : 0;
-  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args, page: SDVIEW ? '' : location.origin + location.pathname}), signal: ac ? ac.signal : undefined}); }
+  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args}), signal: ac ? ac.signal : undefined}); }
   catch (e){ clearTimeout(timer); throw offlineErr(); }
   clearTimeout(timer);
   try { data = await res.json(); }
@@ -2694,6 +2695,8 @@ $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
 $('btnSdLedger').onclick = openSdLedger;
 $('btnSdShare').onclick = () => openShare('sd');
+$('btnCashShare').onclick = () => openShare('cash');
+$('btnDailyShare').onclick = () => openShare('daily');
 $('btnSdUpload').onclick = openSdUpload;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
