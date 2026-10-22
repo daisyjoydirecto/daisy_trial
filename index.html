@@ -305,6 +305,10 @@
   .ledger table.sdl{table-layout:auto;font-size:10.5px}
   .ledger table.sdl th{white-space:normal;line-height:1.2;font-size:9.5px;letter-spacing:.04em;padding:5px 4px}
   .ledger table.sdl td{padding:4px}
+  body.sdview .hbtns, body.sdview main > section, body.sdview #connectBox{display:none!important}
+  body.sdview #sdViewRoot .ledger{max-width:none}
+  .vtabs{display:flex;gap:4px;margin-right:10px}
+  .vtabs .btn.active{background:var(--olive);border-color:var(--olive);color:#fff}
   .ledger tr.owe td{background:#fff8ef}
   .ledger tr.sdrow{cursor:pointer}
   .ledger tr.sdrow .caret{color:#5c8000;font-weight:700}
@@ -503,6 +507,7 @@
       <span class="hint">Per employee per cut-off — purchases, payroll deductions and running balance</span>
       <select id="sdCut" style="width:auto;min-width:210px"></select>
       <button class="btn sm" id="btnSdUpload">⬆ Upload deducted employees</button>
+      <button class="btn sm" id="btnSdShare" title="A link that anyone can open to view and download this ledger (read-only)">🔗 Share link</button>
       <button class="btn primary" id="btnSdLedger">📒 Open ledger</button>
     </div>
     <div class="card" style="margin-bottom:14px;padding:0;overflow:hidden">
@@ -552,6 +557,8 @@
 
 <script>
 /* ================= settings ================= */
+/** Share link mode (?sdview=…): shows ONLY the salary deduction ledger, read-only. */
+const SDVIEW = (() => { try { return new URLSearchParams(location.search).get('sdview') || ''; } catch(e){ return ''; } })();
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbykZQ6nykPhKxgQ9wX2rLMI3mU2HdwpW-Du6-FsNLc-7NBN47Ud7JU-98_s1af_xPNk/exec';
 const COMPANIES = ['MMEI','MMDC','MMHI','MMHC','MMFI','MGT'];   // employee sub-categories
 const CASH_MODE = 'CASH :  OFFICE CASHIER';
@@ -631,6 +638,7 @@ async function api(fn, ...args){
   if (typeof navigator !== 'undefined' && navigator.onLine === false) throw offlineErr();
   if (HAS_GAS) return new Promise((res, rej) => google.script.run.withSuccessHandler(res).withFailureHandler(e => { if (/network|failed to fetch|NetworkError/i.test(String(e && e.message || e))) rej(offlineErr()); else rej(e); })[fn](...args));
   const c = conn();
+  if (SDVIEW) c.key = SDVIEW;           // share link: view-only key (server allows only the salary deduction ledger)
   if (!c.url || !c.key) throw new Error('NOT_CONNECTED');
   let res, data;
   // stop waiting after 90 s (a stuck connection is treated like no internet: saved copy + Sync still work)
@@ -1022,6 +1030,7 @@ function enrich(o){
   return o;
 }
 async function load(silent, fresh){
+  if (SDVIEW) return 'ok';
   if (!HAS_GAS && (!conn().url || !conn().key)){ showConnect(); $('status').textContent = 'Not connected'; return; }
   if (!silent) $('status').textContent = 'Loading…';
   try {
@@ -1707,7 +1716,9 @@ function openSdLedger(){
   $('sdQ').oninput = () => { f.q = $('sdQ').value.trim().toLowerCase(); draw(); };
   $('modalRoot').querySelector('[data-x]').onclick = () => $('modalRoot').innerHTML = '';
   $('doPrint').onclick = () => { $('printArea').innerHTML = '<div class="slip-page">' + sdLedgerHtml(from, to, f) + '</div>'; setTimeout(() => window.print(), 50); };
-  $('sdCsv').onclick = () => {
+  $('sdCsv').onclick = () => sdCsvDownload(from, to, f);
+}
+function sdCsvDownload(from, to, f){
     const L = sdLedger(to), i = L.periods.findIndex(p => p.from === from);
     const q = x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
     const rows = [...L.people.values()].filter(x => (x.beg[i] || x.purch[i] || x.ded[i] || x.end[i]) && (!f.co || x.company === f.co));
@@ -1715,7 +1726,6 @@ function openSdLedger(){
       .concat(rows.map(x => { const lim = sdLimitAt(L, x, i), over = lim !== null && x.purch[i] > lim + 0.005;
         return [from, to, x.company, x.empNo, x.name, payGroupLabel(x.group), lim === null ? '' : lim, over ? 'OVER by ' + r2(x.purch[i] - lim) : '', r2(x.beg[i]), r2(x.purch[i]), r2(x.ded[i]), r2(x.end[i]), (x.emp && limitFor(x.emp) > 0) ? nextLimitOf(limitFor(x.emp), x.end[i]) : ''].map(q).join(','); }));
     download('salary-deduction-ledger-' + from + '.csv', '﻿' + lines.join('\n'), 'text/csv');
-  };
 }
 /* ---------- upload the payroll's list of deducted employees ---------- */
 const DED_AMT = ['AMOUNTDEDUCTED','DEDUCTIONAMOUNT','DEDUCTEDAMOUNT','TOTALDEDUCTION','DEDUCTION','DEDUCTED','AMOUNT','TOTAL','NETAMOUNT'];
@@ -1779,6 +1789,99 @@ function openSdUpload(){
       toast('Deductions saved for ' + cutoffOf(from).label + ' ✓ — balances and credit limits updated');
     } catch (err){ toast('Could not save: ' + (err.message || err), true); $('sdSave').disabled = false; $('sdSave').textContent = 'Save deductions'; }
   };
+}
+
+/* ================= SHARE LINK (view / download the salary deduction ledger only) ================= */
+async function openSdShare(reset){
+  if (needOnline('Making the share link')) return;
+  let k;
+  try { k = await api('sdShareLink', !!reset); }
+  catch (e){ return toast('Could not make the link: ' + (e.message || e) + ' — deploy Code.gs v23 or newer.', true); }
+  const link = location.origin + location.pathname + '?sdview=' + encodeURIComponent(k);
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>🔗 Share the salary deduction ledger</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
+    '<p style="margin-top:0">Anyone with this link can <b>view, print and download</b> the salary deduction ledger. They <b>cannot</b> see other sales, enter, edit or delete anything.</p>' +
+    '<div style="display:flex;gap:8px"><input id="shLink" readonly value="' + esc(link) + '" style="flex:1"><button class="btn primary" id="shCopy">Copy link</button></div>' +
+    '<p class="hint">Data in the link is always live from the Google Sheet. To stop an old link from working, make a new link or turn sharing off.</p>' +
+    '</div><div class="foot"><button class="btn" id="shOff" style="color:#a01c1c">Turn sharing off</button><button class="btn" id="shNew">Make a new link (old one stops)</button><button class="btn" data-x>Close</button></div></div></div>';
+  $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
+  $('shCopy').onclick = () => { $('shLink').select(); (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copied ✓')).catch(() => { document.execCommand('copy'); toast('Link copied ✓'); }); };
+  $('shNew').onclick = () => { if (confirm('Make a new link? The old link will stop working.')) openSdShare(true); };
+  $('shOff').onclick = async () => { if (!confirm('Turn sharing off? The link will stop working.')) return; try { await api('sdShareOff'); $('modalRoot').innerHTML = ''; toast('Sharing turned off — the link no longer works'); } catch (e){ toast('Failed: ' + (e.message || e), true); } };
+}
+/** Payroll deductions uploaded for one cut-off (read-only list). */
+function dedRowsOf(from, f){
+  let list = (LISTS.deductions || []).filter(d => String(d.from) === from);
+  if (f && f.co) list = list.filter(d => (d.company || (sdWho(d.name, d.empNo).emp || {}).company) === f.co);
+  if (f && f.q) list = list.filter(d => (d.name + ' ' + d.empNo).toLowerCase().includes(f.q));
+  return list.slice().sort((a, b) => String(a.company).localeCompare(String(b.company)) || String(a.name).localeCompare(String(b.name)));
+}
+function sdDeductionsHtml(from, to, f){
+  const s = settings(), list = dedRowsOf(from, f), p = cutoffOf(from);
+  const tot = list.reduce((a, d) => a + num(d.amount), 0), up = list[0] && list[0].uploaded;
+  return '<div class="ledger">' +
+    '<div class="sh"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""><div><b>' + esc(s.company) + '</b>' + esc(s.address) + '</div></div>' +
+    '<h2>PAYROLL DEDUCTIONS</h2><div class="sub">Cut-off <b>' + esc(longDate(from)) + ' – ' + esc(longDate(to)) + '</b> · pay day ' + esc(payDayOf(to)) + (up ? ' · uploaded ' + esc(up) : '') + (f && f.co ? ' · ' + esc(f.co) : '') + '</div>' +
+    (list.length
+      ? '<div class="boxes two"><div><span>Employees deducted</span><b>' + list.length + '</b></div><div><span>Total deducted</span><b>₱' + money(tot) + '</b></div></div>' +
+        '<table class="sdl"><thead><tr><th style="width:30px">#</th><th>BU</th><th>Emp. No.</th><th>Employee</th><th class="n">Amount deducted (₱)</th></tr></thead><tbody>' +
+        list.map((d, n) => { const w = sdWho(d.name, d.empNo); return '<tr' + (w.emp ? '' : ' class="nomatch"') + '><td>' + (n + 1) + '</td><td>' + esc(d.company || (w.emp ? w.emp.company : '') || '—') + '</td><td>' + esc(d.empNo || '') + '</td><td><b>' + esc(d.name) + '</b>' + (w.emp ? '' : ' <span class="hint">(not in list)</span>') + '</td><td class="n">' + money(num(d.amount)) + '</td></tr>'; }).join('') +
+        '<tr class="tot"><td colspan="4" style="text-align:right">TOTAL</td><td class="n">' + money(tot) + '</td></tr></tbody></table>'
+      : '<p style="padding:18px;text-align:center;color:#a35400;font-weight:700">No payroll deductions uploaded for this cut-off yet.</p>') +
+    '<div class="foot"><span>Sales Meat &amp; Livestock · payroll deductions (view only)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div>' +
+  '</div>';
+}
+function dedCsvDownload(from, to, f){
+  const q = x => '"' + String(x == null ? '' : x).replace(/"/g, '""') + '"';
+  const lines = [['Cut-off from','Cut-off to','Business unit','Employee No.','Employee','Amount deducted','Uploaded on'].join(',')]
+    .concat(dedRowsOf(from, f).map(d => [from, to, d.company || (sdWho(d.name, d.empNo).emp || {}).company || '', d.empNo, d.name, r2(num(d.amount)), d.uploaded].map(q).join(',')));
+  download('payroll-deductions-' + from + '.csv', '\ufeff' + lines.join('\n'), 'text/csv');
+}
+/** Opened from the share link: show only the ledger. */
+async function sdViewBoot(){
+  document.body.classList.add('sdview');
+  document.title = 'Salary Deduction Ledger — M. Montesclaros Farms';
+  document.querySelector('header.top h1').textContent = 'Salary Deduction Ledger';
+  const root = document.createElement('div'); root.id = 'sdViewRoot'; root.className = 'card';
+  document.querySelector('main').prepend(root);
+  root.innerHTML = '<p class="hint" style="padding:20px;text-align:center">Loading the ledger…</p>';
+  $('status').textContent = 'View only · loading…';
+  try {
+    const d = await api('getSdView');
+    if (d.config){ CAT = d.config.categories || CAT; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; if (d.config.sdRules) SD_RULES = Object.assign({limit: 0, cut: [15, 31], limits: {}, periods: [], balStart: ''}, d.config.sdRules); }
+    const base = emptyLists(); Object.assign(base, d.lists); COMPANIES.forEach(c => base.employees[c] = (d.lists.employees || {})[c] || []);
+    LISTS = base; LISTS_V = d.listsVersion || 'view'; DATA_SINCE = d.since || '';
+    ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); });
+    buildIndex();
+    $('status').textContent = 'View only · data as of ' + d.at;
+  } catch (e){
+    root.innerHTML = '<p style="padding:24px;text-align:center;color:#a01c1c;font-weight:700">This link does not work any more, or the connection failed.<br><span class="hint">' + esc(e.message || e) + '</span></p>';
+    $('status').textContent = 'View only'; return;
+  }
+  const f = {co: '', q: ''};
+  const ps = periodsBetween(sdStart(), todayISO()).reverse();
+  let VIEW = 'ledger';
+  root.innerHTML = '<div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:10px"><div class="vtabs"><button class="btn sm active" data-v="ledger">📒 Ledger</button><button class="btn sm" data-v="ded">💸 Payroll deductions</button></div><b>Cut-off</b><select id="vCut" style="width:auto">' + ps.map(p => '<option value="' + p.from + '|' + p.to + '">' + esc(p.label) + '</option>').join('') + '</select>' +
+    '<select id="vCo" style="width:auto"><option value="">All business units</option>' + COMPANIES.map(c => '<option>' + c + '</option>').join('') + '</select>' +
+    '<input id="vQ" placeholder="Search employee…" style="width:200px"><span style="flex:1"></span>' +
+    '<button class="btn sm" id="vExp">Expand all</button><button class="btn sm" id="vCol">Collapse all</button>' +
+    '<button class="btn" id="vCsv">⬇ Download CSV (Excel)</button><button class="btn primary" id="vPdf">🖨 Print / Save as PDF</button></div>' +
+    '<div class="slipwrap" id="vWrap" style="max-height:none"></div>';
+  const cut = () => $('vCut').value.split('|');
+  const draw = () => {
+    const [a, b] = cut();
+    $('vWrap').innerHTML = VIEW === 'ded' ? sdDeductionsHtml(a, b, f) : sdLedgerHtml(a, b, f);
+    $('vExp').classList.toggle('hidden', VIEW === 'ded'); $('vCol').classList.toggle('hidden', VIEW === 'ded');
+  };
+  draw();
+  root.querySelectorAll('[data-v]').forEach(bt => bt.onclick = () => { VIEW = bt.dataset.v; root.querySelectorAll('[data-v]').forEach(x => x.classList.toggle('active', x === bt)); draw(); });
+  $('vCut').onchange = draw;
+  $('vCo').onchange = () => { f.co = $('vCo').value; draw(); };
+  $('vQ').oninput = () => { f.q = $('vQ').value.trim().toLowerCase(); draw(); };
+  $('vWrap').addEventListener('click', e => { const tr = e.target.closest('tr[data-sdid]'); if (!tr) return; const id = tr.dataset.sdid; SD_OPEN.has(id) ? SD_OPEN.delete(id) : SD_OPEN.add(id); draw(); });
+  $('vExp').onclick = () => { $('vWrap').querySelectorAll('tr[data-sdid]').forEach(t => SD_OPEN.add(t.dataset.sdid)); draw(); };
+  $('vCol').onclick = () => { SD_OPEN.clear(); draw(); };
+  $('vCsv').onclick = () => { const [a, b] = cut(); VIEW === 'ded' ? dedCsvDownload(a, b, f) : sdCsvDownload(a, b, f); };
+  $('vPdf').onclick = () => { const [a, b] = cut(); $('printArea').innerHTML = '<div class="slip-page">' + (VIEW === 'ded' ? sdDeductionsHtml(a, b, f) : sdLedgerHtml(a, b, f)) + '</div>'; setTimeout(() => window.print(), 50); };
 }
 
 /* ================= TRASH BIN ================= */
@@ -2392,6 +2495,7 @@ $('dailyTable').addEventListener('click', e => { const tr = e.target.closest('tr
 $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
 $('btnSdLedger').onclick = openSdLedger;
+$('btnSdShare').onclick = openSdShare;
 $('btnSdUpload').onclick = openSdUpload;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
@@ -2525,7 +2629,8 @@ addLine(); addLine();
 renderLtabs();
 setModes(CAT.walkin); setCustList();
 if (AUTO_REFRESH_MIN) setInterval(() => { if (ONLINE && !$('modalRoot').innerHTML && !LEDIT.dirty && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#tab-entry'))) load(true); }, AUTO_REFRESH_MIN * 60000);
-loadDeviceState().then(showSaved).then(() => load(!!CACHE_AT));
+if (SDVIEW) sdViewBoot();
+else loadDeviceState().then(showSaved).then(() => load(!!CACHE_AT));
 </script>
 <script>
 (function(){function h(){var e=document.querySelector('header.top');if(e)document.documentElement.style.setProperty('--hdr',e.offsetHeight+'px');}
