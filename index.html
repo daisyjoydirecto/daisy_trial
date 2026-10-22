@@ -307,6 +307,7 @@
   .ledger table.sdl td{padding:4px}
   body.sdview .hbtns, body.sdview main > section, body.sdview #connectBox{display:none!important}
   body.sdview #sdViewRoot .ledger{max-width:none}
+  .ledger.dprint .daily{min-width:0;width:100%}
   .vtabs{display:flex;gap:4px;margin-right:10px}
   .vtabs .btn.active{background:var(--olive);border-color:var(--olive);color:#fff}
   .ledger tr.owe td{background:#fff8ef}
@@ -346,6 +347,8 @@
     body > *:not(#printArea){display:none!important}
     #printArea{display:block!important}
     #printArea .slip,#printArea .auth,#printArea .ar,#printArea .ledger{box-shadow:none;max-width:none;padding:0;margin:0}
+    #printArea .dprint .daily{min-width:0;width:100%;font-size:9.5px}
+    #printArea .dprint .daily th,#printArea .dprint .daily td{padding:3px 5px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     #printArea .ar-pair .ar + .ar{margin-top:16mm;padding-top:10mm;border-top:1px dashed #999}
     #printArea .slip th,#printArea .slip tr.tot td{-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .slip-page{page-break-after:always}
@@ -558,7 +561,9 @@
 <script>
 /* ================= settings ================= */
 /** Share link mode (?sdview=…): shows ONLY the salary deduction ledger, read-only. */
-const SDVIEW = (() => { try { return new URLSearchParams(location.search).get('sdview') || ''; } catch(e){ return ''; } })();
+/*  ?dview=… = Daily sales (Cash vs Credit) only · ?cview=… = Daily cash ledger only */
+const SHARE_KIND = (() => { try { const q = new URLSearchParams(location.search); return q.get('sdview') ? 'sd' : q.get('dview') ? 'daily' : q.get('cview') ? 'cash' : ''; } catch(e){ return ''; } })();
+const SDVIEW = (() => { try { const q = new URLSearchParams(location.search); return q.get('sdview') || q.get('dview') || q.get('cview') || ''; } catch(e){ return ''; } })();
 const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbykZQ6nykPhKxgQ9wX2rLMI3mU2HdwpW-Du6-FsNLc-7NBN47Ud7JU-98_s1af_xPNk/exec';
 const COMPANIES = ['MMEI','MMDC','MMHI','MMHC','MMFI','MGT'];   // employee sub-categories
 const CASH_MODE = 'CASH :  OFFICE CASHIER';
@@ -644,7 +649,7 @@ async function api(fn, ...args){
   // stop waiting after 90 s (a stuck connection is treated like no internet: saved copy + Sync still work)
   const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ac ? setTimeout(() => ac.abort(), 90000) : 0;
-  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args}), signal: ac ? ac.signal : undefined}); }
+  try { res = await fetch(c.url, {method:'POST', body: JSON.stringify({key: c.key, fn, args, page: SDVIEW ? '' : location.origin + location.pathname}), signal: ac ? ac.signal : undefined}); }
   catch (e){ clearTimeout(timer); throw offlineErr(); }
   clearTimeout(timer);
   try { data = await res.json(); }
@@ -1906,21 +1911,100 @@ function openSdUpload(){
 }
 
 /* ================= SHARE LINK (view / download the salary deduction ledger only) ================= */
-async function openSdShare(reset){
+const SHARE_INFO = {
+  sd:    {param: 'sdview', title: 'the salary deduction ledger', what: 'view, print and download the salary deduction ledger'},
+  daily: {param: 'dview',  title: 'Daily sales — Cash vs Credit', what: 'view, print and download the <b>Daily sales — Cash vs Credit / Salary deduct</b> table (totals only — no customer names)'},
+  cash:  {param: 'cview',  title: 'the daily cash ledger', what: 'view and print the <b>daily cash ledger</b> of any day'}
+};
+function openSdShare(){ return openShare('sd'); }
+async function openShare(kind, reset){
   if (needOnline('Making the share link')) return;
+  const I = SHARE_INFO[kind];
   let k;
-  try { k = await api('sdShareLink', !!reset); }
-  catch (e){ return toast('Could not make the link: ' + (e.message || e) + ' — deploy Code.gs v23 or newer.', true); }
-  const link = location.origin + location.pathname + '?sdview=' + encodeURIComponent(k);
-  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>🔗 Share the salary deduction ledger</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
-    '<p style="margin-top:0">Anyone with this link can <b>view, print and download</b> the salary deduction ledger. They <b>cannot</b> see other sales, enter, edit or delete anything.</p>' +
+  try { k = kind === 'sd' ? await api('sdShareLink', !!reset) : await api('shareLink', kind, !!reset); }
+  catch (e){ return toast('Could not make the link: ' + (e.message || e) + ' — deploy Code.gs ' + (kind === 'sd' ? 'v23' : 'v24') + ' or newer.', true); }
+  const link = location.origin + location.pathname + '?' + I.param + '=' + encodeURIComponent(k);
+  $('modalRoot').innerHTML = '<div class="overlay"><div class="modal"><div class="mh"><h3>🔗 Share ' + I.title + '</h3><button class="btn ghost sm" data-x>✕</button></div><div class="body">' +
+    '<p style="margin-top:0">Anyone with this link can ' + I.what + '. They <b>cannot</b> see other reports, enter, edit or delete anything.</p>' +
     '<div style="display:flex;gap:8px"><input id="shLink" readonly value="' + esc(link) + '" style="flex:1"><button class="btn primary" id="shCopy">Copy link</button></div>' +
-    '<p class="hint">Data in the link is always live from the Google Sheet. To stop an old link from working, make a new link or turn sharing off.</p>' +
+    '<p class="hint">Data in the link is always live from the Google Sheet. Each report has its own link. To stop an old link from working, make a new link or turn sharing off.</p>' +
     '</div><div class="foot"><button class="btn" id="shOff" style="color:#a01c1c">Turn sharing off</button><button class="btn" id="shNew">Make a new link (old one stops)</button><button class="btn" data-x>Close</button></div></div></div>';
   $('modalRoot').querySelectorAll('[data-x]').forEach(b => b.onclick = () => $('modalRoot').innerHTML = '');
   $('shCopy').onclick = () => { $('shLink').select(); (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => toast('Link copied ✓')).catch(() => { document.execCommand('copy'); toast('Link copied ✓'); }); };
-  $('shNew').onclick = () => { if (confirm('Make a new link? The old link will stop working.')) openSdShare(true); };
-  $('shOff').onclick = async () => { if (!confirm('Turn sharing off? The link will stop working.')) return; try { await api('sdShareOff'); $('modalRoot').innerHTML = ''; toast('Sharing turned off — the link no longer works'); } catch (e){ toast('Failed: ' + (e.message || e), true); } };
+  $('shNew').onclick = () => { if (confirm('Make a new link? The old link will stop working.')) openShare(kind, true); };
+  $('shOff').onclick = async () => { if (!confirm('Turn sharing off? The link will stop working.')) return; try { await (kind === 'sd' ? api('sdShareOff') : api('shareOff', kind)); $('modalRoot').innerHTML = ''; toast('Sharing turned off — the link no longer works'); } catch (e){ toast('Failed: ' + (e.message || e), true); } };
+}
+/** Common start of a share-link page. */
+function viewShell(title){
+  document.body.classList.add('sdview');
+  document.title = title + ' — M. Montesclaros Farms';
+  document.querySelector('header.top h1').textContent = title;
+  const root = document.createElement('div'); root.id = 'sdViewRoot'; root.className = 'card';
+  document.querySelector('main').prepend(root);
+  $('status').textContent = 'View only · loading…';
+  return root;
+}
+const viewErr = e => '<p style="padding:24px;text-align:center;color:#a01c1c;font-weight:700">This link does not work any more, or the connection failed.<br><span class="hint">' + esc(e.message || e) + '</span></p>';
+/** Share link: Daily sales — Cash vs Credit / Salary deduct (totals only). */
+async function dailyViewBoot(){
+  const old = $('dailyTable'); if (old) old.remove();
+  const root = viewShell('Daily Sales — Cash vs Credit');
+  const t = todayISO(), d0 = new Date();
+  const lastFrom = isoOf(new Date(d0.getFullYear(), d0.getMonth() - 1, 1)), lastTo = isoOf(new Date(d0.getFullYear(), d0.getMonth(), 0));
+  root.innerHTML = '<div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:10px"><div class="vtabs"><button class="btn sm active" data-r="month">This month</button><button class="btn sm" data-r="last">Last month</button></div>' +
+    '<b>From</b><input type="date" id="vFrom" style="width:auto" value="' + t.slice(0, 8) + '01"><b>To</b><input type="date" id="vTo" style="width:auto" value="' + t + '">' +
+    '<span style="flex:1"></span><button class="btn" id="vCsv">⬇ Export CSV</button><button class="btn primary" id="vPdf">🖨 Print / Save as PDF</button></div>' +
+    '<div id="vHead" style="padding:4px 2px 8px"></div><div style="overflow:auto"><table class="daily" id="dailyTable"></table></div><div id="vMsg"></div>';
+  let SEQ = 0;
+  const loadRange = async () => {
+    const from = $('vFrom').value, to = $('vTo').value, my = ++SEQ;
+    $('status').textContent = 'View only · loading…'; $('vMsg').innerHTML = '<p class="hint" style="padding:14px;text-align:center">Loading…</p>';
+    try {
+      const d = await api('getDailyView', from, to);
+      if (my !== SEQ) return;
+      if (d.config && d.config.categories) CAT = d.config.categories;
+      const v = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); });
+      renderDaily(v, {});
+      $('vHead').innerHTML = '<h2 style="margin:0">DAILY SALES — CASH VS CREDIT / SALARY DEDUCT</h2><span class="hint">' + esc(from ? longDate(from) : 'Start') + ' – ' + esc(to ? longDate(to) : 'today') + ' · transactions are counted per person</span>';
+      $('vMsg').innerHTML = ''; $('status').textContent = 'View only · data as of ' + d.at;
+    } catch (e){ if (my === SEQ){ $('vMsg').innerHTML = viewErr(e); $('dailyTable').innerHTML = ''; $('status').textContent = 'View only'; } }
+  };
+  root.querySelectorAll('[data-r]').forEach(bt => bt.onclick = () => {
+    root.querySelectorAll('[data-r]').forEach(x => x.classList.toggle('active', x === bt));
+    if (bt.dataset.r === 'month'){ $('vFrom').value = t.slice(0, 8) + '01'; $('vTo').value = t; } else { $('vFrom').value = lastFrom; $('vTo').value = lastTo; }
+    loadRange();
+  });
+  const manual = () => { root.querySelectorAll('[data-r]').forEach(x => x.classList.remove('active')); loadRange(); };
+  $('vFrom').onchange = manual; $('vTo').onchange = manual;
+  $('vCsv').onclick = exportDaily;
+  $('vPdf').onclick = () => { const s = settings(); $('printArea').innerHTML = '<div class="slip-page"><div class="ledger dprint"><div class="sh"><img src="' + (s.logo || DEFAULT_LOGO) + '" alt=""><div><b>' + esc(s.company) + '</b>' + esc(s.address) + '</div></div>' + $('vHead').innerHTML + '<table class="daily">' + $('dailyTable').innerHTML + '</table><div class="foot"><span>Sales Meat &amp; Livestock · daily sales (view only)</span><span>Printed ' + new Date().toLocaleString('en-PH') + '</span></div></div></div>'; setTimeout(() => window.print(), 50); };
+  loadRange();
+}
+/** Share link: Daily cash ledger of one day (read-only). */
+async function cashViewBoot(){
+  const root = viewShell('Daily Cash Ledger');
+  root.innerHTML = '<div class="toolbar" style="flex-wrap:wrap;gap:8px;margin-bottom:10px"><button class="btn sm" id="vPrev" title="Previous day">◀</button><input type="date" id="vDate" style="width:auto" value="' + todayISO() + '"><button class="btn sm" id="vNext" title="Next day">▶</button><button class="btn sm" id="vToday">Today</button>' +
+    '<span style="flex:1"></span><button class="btn primary" id="vPdf">🖨 Print / Save as PDF</button></div><div class="slipwrap" id="vWrap" style="max-height:none"></div>';
+  let SEQ = 0, CUR = {date: '', no: ''};
+  const show = async () => {
+    const date = $('vDate').value || todayISO(), my = ++SEQ;
+    $('status').textContent = 'View only · loading…'; $('vWrap').innerHTML = '<p class="hint" style="padding:20px;text-align:center">Loading the cash ledger…</p>';
+    try {
+      const d = await api('getCashView', date);
+      if (my !== SEQ) return;
+      if (d.config){ CAT = d.config.categories || CAT; CONTROL_FIELD = d.config.controlField || CONTROL_FIELD; }
+      ROWS = d.rows.map(a => { const o = {_row: a[0]}; d.keys.forEach((k, i) => o[k] = a[i+1]); return enrich(o); });
+      CUR = {date: d.date, no: d.no};
+      $('vWrap').innerHTML = ledgerHtml(d.date, d.no, false);
+      $('status').textContent = 'View only · data as of ' + d.at;
+    } catch (e){ if (my === SEQ){ $('vWrap').innerHTML = viewErr(e); $('status').textContent = 'View only'; } }
+  };
+  const step = n => { const x = new Date(($('vDate').value || todayISO()) + 'T00:00:00'); x.setDate(x.getDate() + n); $('vDate').value = isoOf(x); show(); };
+  $('vPrev').onclick = () => step(-1); $('vNext').onclick = () => step(1);
+  $('vToday').onclick = () => { $('vDate').value = todayISO(); show(); };
+  $('vDate').onchange = show;
+  $('vPdf').onclick = () => { if (!CUR.date) return; $('printArea').innerHTML = '<div class="slip-page">' + ledgerHtml(CUR.date, CUR.no, false) + '</div>'; setTimeout(() => window.print(), 50); };
+  show();
 }
 /** Payroll deductions uploaded for one cut-off (read-only list). */
 function dedRowsOf(from, f){
@@ -2325,7 +2409,7 @@ function renderDaily(v, f){
     '<tr><th class="hCash" colspan="3">CASH</th><th class="hCred" colspan="3">CREDIT / SALARY DEDUCT</th></tr>' +
     '<tr><th class="hAll">Date</th><th class="hAll">Day</th><th class="hAll">Transactions</th><th class="hAll">Weight (kg)</th><th class="hAll">Amount (₱)</th>' +
     '<th class="hCash"># of Transactions</th><th class="hCash">Weight (kg)</th><th class="hCash">Amount (₱)</th><th class="hCred"># of Transactions</th><th class="hCred">Weight (kg)</th><th class="hCred">Amount (₱)</th></tr></thead><tbody>' +
-    (days.length ? days.map(e => '<tr data-day="' + e.d + '" title="Click to see who was counted as Cash and as Credit / Salary deduct" class="clk' + (e.d === today ? ' today' : '') + '"><td class="l">' + slashDate(e.d) + '</td><td class="l">' + dayOf(e.d) + '</td>' + cells(e) + '</tr>').join('')
+    (days.length ? days.map(e => (SDVIEW ? '<tr class="' + (e.d === today ? 'today' : '') + '">' : '<tr data-day="' + e.d + '" title="Click to see who was counted as Cash and as Credit / Salary deduct" class="clk' + (e.d === today ? ' today' : '') + '">') + '<td class="l">' + slashDate(e.d) + '</td><td class="l">' + dayOf(e.d) + '</td>' + cells(e) + '</tr>').join('')
       : '<tr><td class="l muted" colspan="11" style="text-align:center;padding:16px">No sales in the selected period.</td></tr>') +
     '<tr class="tot"><td class="l" colspan="2">' + totLabel + '</td>' + cells(T) + '</tr>' +
     '<tr class="avg"><td class="l" colspan="2">DAILY AVERAGE</td>' + cells(avg) + '</tr>' +
@@ -2609,7 +2693,7 @@ $('dailyTable').addEventListener('click', e => { const tr = e.target.closest('tr
 $('ledDate').value = todayISO();
 $('btnLedger').onclick = openLedger;
 $('btnSdLedger').onclick = openSdLedger;
-$('btnSdShare').onclick = openSdShare;
+$('btnSdShare').onclick = () => openShare('sd');
 $('btnSdUpload').onclick = openSdUpload;
 $('btnSettings').onclick = openSettings;
 $('btnTrash').onclick = openTrash;
@@ -2743,7 +2827,7 @@ addLine(); addLine();
 renderLtabs();
 setModes(CAT.walkin); setCustList();
 if (AUTO_REFRESH_MIN) setInterval(() => { if (ONLINE && !$('modalRoot').innerHTML && !LEDIT.dirty && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('#tab-entry'))) load(true); }, AUTO_REFRESH_MIN * 60000);
-if (SDVIEW) sdViewBoot();
+if (SDVIEW) (SHARE_KIND === 'daily' ? dailyViewBoot : SHARE_KIND === 'cash' ? cashViewBoot : sdViewBoot)();
 else loadDeviceState().then(showSaved).then(() => load(!!CACHE_AT));
 </script>
 <script>
